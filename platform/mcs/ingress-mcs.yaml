@@ -146,3 +146,14 @@ spec:
                 name: prometheus-service
                 port:
                   number: 80
+
+    - host: grafana.{{HOSTING_FQDN}}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 80

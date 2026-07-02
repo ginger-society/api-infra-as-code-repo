@@ -65,5 +65,8 @@
   },
   "PROMETHEUS": {
     "CLOUD_PROVIDER_FQDN": "vault(CLOUD_PROVIDER_FQDN)"
+  },
+  "GRAFANA": {
+    "ADMIN_PASSWORD": "vault(GRAFANA_ADMIN_PASSWORD)"
   }
 }

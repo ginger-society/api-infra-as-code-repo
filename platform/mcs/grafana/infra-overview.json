@@ -1,0 +1,200 @@
+{
+    "title": "Infra Overview",
+    "uid": "infra-overview",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "refresh": "10s",
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "templating": {
+        "list": [
+            {
+                "name": "host",
+                "type": "query",
+                "datasource": {
+                    "type": "prometheus",
+                    "uid": "Prometheus"
+                },
+                "query": "label_values(node_uname_info, host)",
+                "refresh": 2,
+                "includeAll": true,
+                "multi": true,
+                "current": {
+                    "text": "All",
+                    "value": "$__all"
+                }
+            }
+        ]
+    },
+    "panels": [
+        {
+            "id": 1,
+            "title": "CPU Usage % by Host",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "100 - (avg by (host) (rate(node_cpu_seconds_total{mode=\"idle\", host=~\"$host\"}[5m])) * 100)",
+                    "legendFormat": "{{host}}"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "title": "Memory Usage % by Host",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "(1 - (node_memory_MemAvailable_bytes{host=~\"$host\"} / node_memory_MemTotal_bytes{host=~\"$host\"})) * 100",
+                    "legendFormat": "{{host}}"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "title": "Network Receive by Host",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "Bps"
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "sum by (host) (rate(node_network_receive_bytes_total{host=~\"$host\", device!~\"lo|veth.*|docker.*|cni.*\"}[5m]))",
+                    "legendFormat": "{{host}} rx"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "title": "Network Transmit by Host",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "Bps"
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "sum by (host) (rate(node_network_transmit_bytes_total{host=~\"$host\", device!~\"lo|veth.*|docker.*|cni.*\"}[5m]))",
+                    "legendFormat": "{{host}} tx"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "title": "Top Containers by CPU",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percentunit"
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "topk(10, sum by (name, host) (rate(container_cpu_usage_seconds_total{host=~\"$host\", name!=\"\"}[5m])))",
+                    "legendFormat": "{{host}} / {{name}}"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "title": "Top Containers by Memory",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+            },
+            "datasource": {
+                "type": "prometheus",
+                "uid": "Prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "bytes"
+                },
+                "overrides": []
+            },
+            "targets": [
+                {
+                    "expr": "topk(10, sum by (name, host) (container_memory_usage_bytes{host=~\"$host\", name!=\"\"}))",
+                    "legendFormat": "{{host}} / {{name}}"
+                }
+            ]
+        }
+    ]
+}

@@ -7,7 +7,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: 3Gi
   storageClassName: standard
 ---
 apiVersion: apps/v1
@@ -46,6 +46,31 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
+
+        # ── Sidecar: auth proxy ───────────────────────────────────────────────
+        # Listens on :3000, validates JWTs, and forwards authed traffic
+        # to Prometheus on localhost:9090.
+        - name: ginger-auth-proxy
+          image: gingersociety/ginger-auth-proxy:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: JWT_SECRET
+            - name: UPSTREAM_URL
+              value: "http://localhost:9090"
+            - name: IAM_LOGIN_URL
+              value: "https://iam.gingersociety.org/#prometheus/login"   # ← replace with your IAM URL
+            - name: PORT
+              value: "3000"
+            # Uncomment to bypass auth on specific paths, e.g. for
+            # unauthenticated scraping by other in-cluster Prometheus/Grafana
+            # instances, or health checks.
+            # - name: EXCLUDED_PATHS
+            #   value: "/-/healthy,/-/ready"
       volumes:
         - name: config
           configMap:
@@ -62,7 +87,8 @@ spec:
   selector:
     app: prometheus
   ports:
-    - protocol: TCP
+    - name: proxy
+      protocol: TCP
       port: 80
-      targetPort: 9090
+      targetPort: 3000   # ← traffic enters through the auth proxy, not Prometheus directly
   type: ClusterIP
