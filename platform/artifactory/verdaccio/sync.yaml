@@ -6,56 +6,62 @@ type: Opaque
 stringData:
   token: "{{NPM.SYNC_TOKEN}}"
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: CronJob
 metadata:
   name: npm-public-sync
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: npm-public-sync
-  template:
-    metadata:
-      labels:
-        app: npm-public-sync
+  schedule: "0 * * * *"          # hourly — matches old SLEEP_SECONDS=3600
+  concurrencyPolicy: Forbid       # don't overlap runs if one takes >1h
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
     spec:
-      # Must land on the same node as verdaccio-pvc (RWO + node-pinned).
-      nodeSelector:
-        kubernetes.io/hostname: artifactory-control-plane
-      tolerations:
-        - key: "node-role.kubernetes.io/control-plane"
-          operator: "Exists"
-          effect: "NoSchedule"
-      containers:
-        - name: sync
-          image: gingersociety/npm-public-sync:latest
-          env:
-            - name: SYNC_PACKAGES
-              value: "@gingersociety/ginger-ui"
-            - name: STORAGE_DIR
-              value: "/verdaccio/storage"
-            - name: SLEEP_SECONDS
-              value: "3600"
-            - name: DRY_RUN
-              value: "false"
-            - name: NPM_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: npm-public-token
-                  key: token
-          volumeMounts:
-            - mountPath: /verdaccio/storage
-              name: verdaccio-storage
-              readOnly: true
-          resources:
-            requests:
-              cpu: 10m
-              memory: 64Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
-      volumes:
-        - name: verdaccio-storage
-          persistentVolumeClaim:
-            claimName: verdaccio-pvc
+      backoffLimit: 0               # one attempt; let the hourly schedule retry
+      activeDeadlineSeconds: 1800   # kill a stuck run after 30m
+      template:
+        metadata:
+          labels:
+            app: npm-public-sync
+        spec:
+          restartPolicy: Never
+          # Must land on the same node as verdaccio-pvc (RWO + node-pinned).
+          nodeSelector:
+            kubernetes.io/hostname: artifactory-control-plane
+          tolerations:
+            - key: "node-role.kubernetes.io/control-plane"
+              operator: "Exists"
+              effect: "NoSchedule"
+          containers:
+            - name: sync
+              image: gingersociety/public-registry-publisher:latest
+              args: ["push-node"]
+              env:
+                - name: SYNC_PACKAGES
+                  value: "@gingersociety/ginger-ui"
+                - name: STORAGE_DIR
+                  value: "/verdaccio/storage"
+                - name: NPM_REGISTRY
+                  value: "https://registry.npmjs.org"
+                - name: DRY_RUN
+                  value: "false"
+                - name: NPM_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: npm-public-token
+                      key: token
+              volumeMounts:
+                - mountPath: /verdaccio/storage
+                  name: verdaccio-storage
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+          volumes:
+            - name: verdaccio-storage
+              persistentVolumeClaim:
+                claimName: verdaccio-pvc

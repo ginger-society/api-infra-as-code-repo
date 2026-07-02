@@ -84,3 +84,73 @@ metadata:
   name: ginger-bucket-config
 data:
   UPLOAD_MIRROR_BUCKETS: "ginger-infra-binaries"
+
+
+---
+# nginx deployment for serving/downloading files from the same bucket-data volume
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ginger-bucket-nginx-download
+  labels:
+    app: ginger-bucket-nginx-download
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ginger-bucket-nginx-download
+  template:
+    metadata:
+      labels:
+        app: ginger-bucket-nginx-download
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: bucket-data
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+      volumes:
+        - name: bucket-data
+          persistentVolumeClaim:
+            claimName: ginger-bucket-pvc
+            readOnly: true
+        - name: nginx-config
+          configMap:
+            name: ginger-bucket-nginx-config
+---
+# nginx config: directory listing + autoindex so files can be downloaded over HTTP
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ginger-bucket-nginx-config
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+ 
+        # Directory listing at the root so files can be browsed
+        location / {
+            root /usr/share/nginx/html;
+            autoindex on;
+            autoindex_exact_size off;
+            autoindex_localtime on;
+        }
+ 
+        # Force every actual file to download as a stream instead of
+        # rendering inline (.txt, .html, .jpg, .pdf, etc all get this).
+        location ~ ^/(?!$).+ {
+            root /usr/share/nginx/html;
+            default_type application/octet-stream;
+            add_header Content-Disposition "attachment";
+            autoindex off;
+        }
+    }
