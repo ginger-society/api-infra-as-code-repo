@@ -1,42 +1,4 @@
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: verdaccio-config
-data:
-  config.yaml: |
-    storage: /verdaccio/storage
-    web:
-      title: "GingerSociety Artifactory"
-      favicon: https://www.gingersociety.org/ginger_icon.ico
-    auth:
-      htpasswd:
-        file: /verdaccio/storage/htpasswd
-    uplinks:
-      npmjs:
-        url: https://registry.npmjs.org/
-    packages:
-      '@gingersociety/*':         
-        access: $all
-        publish: $all
-
-      '@*/*':
-        access: $authenticated
-        publish: $authenticated
-        proxy: npmjs
-      '**':
-        access: $authenticated
-        publish: $authenticated
-        proxy: npmjs
-    server:
-      trustProxy: "10.0.0.0/8"
-    experiments:
-      trust_proxy: true      
-    log:
-      type: stdout
-      format: pretty
-      level: http
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   annotations:
@@ -49,6 +11,14 @@ spec:
   resources:
     requests:
       storage: 30Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: node-registry-service-api-secrets
+type: Opaque
+stringData:
+  ROCKET_SECRET_KEY: {{shared.ROCKET_SECRET_KEY}}
 
 ---
 apiVersion: apps/v1
@@ -67,31 +37,48 @@ spec:
     spec:
       containers:
         - name: verdaccio
-          image: gingersociety/artifactory-npm:latest
+          image: gingersociety/node-registry:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 4873
+            - containerPort: 8080
           env:
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hampi-redis-auth
+                  key: url
+            - name: PACKAGES_DIR
+              value: "/verdaccio/storage"
             - name: VERDACCIO_PUBLIC_URL
               value: "https://npm.gingersociety.org"
-            - name: JWT_SECRET_KEY
+            - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: verdaccio-secrets   # secret name
                   key: JWT_SECRET_KEY       # key inside the secret
+
+            - name: IAM_LOGIN_URL
+              value: "https://iam.{{HOSTING_FQDN}}/#node-packages-registry/login"   # ← replace with your IAM URL
+            - name: RUST_LOG
+              value: "debug"
+            - name: ROCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: node-registry-service-api-secrets
+                  key: ROCKET_SECRET_KEY
+            - name: ROCKET_ADDRESS
+              value: "0.0.0.0"
+
+            - name: ROCKET_PORT
+              value: "8080"
+
           volumeMounts:
             - name: storage
               mountPath: /verdaccio/storage
-            - name: config        
-              mountPath: /verdaccio/conf/config.yaml
-              subPath: config.yaml
       volumes:
         - name: storage
           persistentVolumeClaim:
             claimName: verdaccio-pvc
-        - name: config            
-          configMap:
-            name: verdaccio-config
 
 ---
 apiVersion: v1
@@ -104,4 +91,4 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 4873
+      targetPort: 8080

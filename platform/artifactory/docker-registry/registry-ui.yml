@@ -1,3 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: container-registry-service-api-secrets
+type: Opaque
+stringData:
+  ROCKET_SECRET_KEY: {{shared.ROCKET_SECRET_KEY}}
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,44 +28,46 @@ spec:
           operator: "Exists"
           effect: "NoSchedule"
       containers:
-        # ── Primary: docker registry UI ───────────────────────────────────────
+        # ── registry-ui: now handles its own session auth (JWT cookie
+        # check + IAM redirect + handle-auth callback) internally, so the
+        # ginger-auth-proxy sidecar is no longer needed for this service. ──
         - name: registry-ui
-          image: gingersociety/docker-registry-ui
+          image: gingersociety/container-registry-ui:latest
           imagePullPolicy: Always
           env:
-            - name: NODE_ENV
-              value: "production"
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hampi-redis-auth
+                  key: url
             - name: REGISTRY_HOST
               value: "docker.gingersociety.org"
             - name: REGISTRY_SSL
               value: "true"
             - name: AUTH_SERVER
-              value: "https://api.gingersociety.org/iam/docker-token"
-          ports:
-            - containerPort: 80
-
-        # ── Sidecar: auth proxy ───────────────────────────────────────────────
-        # Listens on :3000, validates JWTs, forwards authed traffic to
-        # the registry-ui on localhost:80.
-        - name: ginger-auth-proxy
-          image: gingersociety/ginger-auth-proxy:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: JWT_SECRET_KEY
+              value: "https://api.{{HOSTING_FQDN}}/iam/docker-token"
+            - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: platform-secrets
                   key: JWT_SECRET
-            - name: UPSTREAM_URL
-              value: "http://localhost:80"
             - name: IAM_LOGIN_URL
               value: "https://iam.{{HOSTING_FQDN}}/#docker-registry/login"   # ← replace with your IAM URL
-            - name: PORT
-              value: "3000"
-            # Uncomment to bypass auth on specific paths
-            # - name: EXCLUDED_PATHS
-            #   value: "/health"
+            - name: RUST_LOG
+              value: "debug"
+
+            - name: ROCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: container-registry-service-api-secrets
+                  key: ROCKET_SECRET_KEY
+            - name: ROCKET_ADDRESS
+              value: "0.0.0.0"
+
+            - name: ROCKET_PORT
+              value: "8080"
+          ports:
+            - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -68,5 +79,5 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 3000   # ← traffic enters through the auth proxy
+      targetPort: 8080
   type: ClusterIP

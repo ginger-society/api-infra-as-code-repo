@@ -1,3 +1,14 @@
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pip-index-service-api-secrets
+type: Opaque
+stringData:
+  ROCKET_SECRET_KEY: {{shared.ROCKET_SECRET_KEY}}
+
+---
+
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -32,43 +43,47 @@ spec:
           operator: "Exists"
           effect: "NoSchedule"
       containers:
-        # ── Primary: pypi index ───────────────────────────────────────────────
-        - name: pypiserver
-          image: gingersociety/pypi-index:latest
-          args:
-            - "run"
-            - "--authenticate"
-            - "update,download,list"
-            - "./packages"
+        # ── pip-index: now handles its own auth internally (BasicAuth for
+        # protocol routes, session-cookie + IAM redirect for /details), so
+        # the ginger-auth-proxy sidecar is no longer needed. ──────────────
+        - name: pip-index
+          image: gingersociety/pip-index:latest
+          imagePullPolicy: Always
+          env:
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hampi-redis-auth
+                  key: url
+            - name: PACKAGES_DIR
+              value: "/data/packages"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: JWT_SECRET
+            - name: IAM_LOGIN_URL
+              value: "https://iam.{{HOSTING_FQDN}}/#pypi-index/login"
+            - name: PUBLIC_BASE_URL
+              value: "https://pip.{{HOSTING_FQDN}}/"
+            - name: RUST_LOG
+              value: "debug"
+
+            - name: ROCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pip-index-service-api-secrets
+                  key: ROCKET_SECRET_KEY
+            - name: ROCKET_ADDRESS
+              value: "0.0.0.0"
+
+            - name: ROCKET_PORT
+              value: "8080"
           ports:
             - containerPort: 8080
           volumeMounts:
             - mountPath: /data/packages
               name: pypi-storage
-
-        # ── Sidecar: auth proxy ───────────────────────────────────────────────
-        # Listens on :3000, validates JWTs, and forwards authed traffic
-        # to the pypiserver on localhost:8080.
-        - name: ginger-auth-proxy
-          image: gingersociety/ginger-auth-proxy:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: JWT_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: platform-secrets
-                  key: JWT_SECRET
-            - name: UPSTREAM_URL
-              value: "http://localhost:8080"
-            - name: IAM_LOGIN_URL
-              value: "https://iam.gingersociety.org/#pypi-index/login"   # ← replace with your IAM URL
-            - name: PORT
-              value: "3000"
-            # Uncomment and set to bypass auth on specific paths, e.g. health checks
-            # - name: EXCLUDED_PATHS
-            #   value: "/health,/simple"
-
       volumes:
         - name: pypi-storage
           persistentVolumeClaim:
@@ -82,8 +97,8 @@ spec:
   selector:
     app: pypiserver
   ports:
-    - name: proxy
+    - name: http
       protocol: TCP
       port: 80
-      targetPort: 3000   # ← traffic enters through the auth proxy, not pypiserver directly
+      targetPort: 8080
   type: ClusterIP
