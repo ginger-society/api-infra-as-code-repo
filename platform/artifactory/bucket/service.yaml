@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: ginger-bucket-upload-service
+  name: ginger-bucket-service
   labels:
     app: ginger-bucket
 spec:
@@ -13,20 +13,3 @@ spec:
       port: 80
       targetPort: 8080
 
-
----
-# Service in front of the nginx download deployment
-apiVersion: v1
-kind: Service
-metadata:
-  name: ginger-bucket-download-service
-  labels:
-    app: ginger-bucket-nginx-download
-spec:
-  selector:
-    app: ginger-bucket-nginx-download
-  ports:
-    - name: http
-      protocol: TCP
-      port: 80
-      targetPort: 80

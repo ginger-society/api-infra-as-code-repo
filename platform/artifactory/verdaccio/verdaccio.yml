@@ -56,7 +56,13 @@ spec:
                 secretKeyRef:
                   name: verdaccio-secrets   # secret name
                   key: JWT_SECRET_KEY       # key inside the secret
-
+            - name: RABBITMQ_URI
+              valueFrom:
+                secretKeyRef:
+                  name: chikkamagaluru-rabbitmq-auth
+                  key: amqp_url
+            - name: SYNC_PACKAGES
+              value: "@gingersociety/ginger-ui"
             - name: IAM_LOGIN_URL
               value: "https://iam.{{HOSTING_FQDN}}/#node-packages-registry/login"   # ← replace with your IAM URL
             - name: RUST_LOG

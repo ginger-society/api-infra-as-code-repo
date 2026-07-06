@@ -69,6 +69,20 @@ spec:
             - name: RUST_LOG
               value: "debug"
 
+            - name: RABBITMQ_URI
+              valueFrom:
+                secretKeyRef:
+                  name: chikkamagaluru-rabbitmq-auth
+                  key: amqp_url
+            - name: TWINE_USERNAME
+              value: "__token__"
+            - name: TWINE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pypi-public-token
+                  key: token
+            - name: SYNC_PACKAGES
+              value: "ginger_dj_framework"
             - name: ROCKET_SECRET_KEY
               valueFrom:
                 secretKeyRef:

@@ -26,21 +26,13 @@ spec:
     - host: bucket.{{HOSTING_FQDN}}
       http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: ginger-bucket-upload-service
-                port:
-                  number: 80
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: ginger-bucket-download-service
+                name: ginger-bucket-service
                 port:
                   number: 80
-
     - host: docker-ui.{{HOSTING_FQDN}}
       http:
         paths:

@@ -56,3 +56,17 @@ data:
           - targets: ['dc0102.{{PROMETHEUS.CLOUD_PROVIDER_FQDN}}']
             labels:
               host: dc0102
+            
+      # ginger-infra devices — one shared host, device identity is in the
+      # path rather than the target. Each device registered via the
+      # heartbeat/presence service (with the "metrics" capability enabled)
+      # needs its own static_config entry here, keyed by its channel id
+      # (see GET /presence/available-devices).
+      - job_name: 'ginger-infra-air'
+        scheme: https
+        metrics_path: /presence/device-metrics/air.ginger_infra_43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d
+        static_configs:
+          - targets: ['api.gingersociety.org']
+            labels:
+              host: air
+              device_channel: air.ginger_infra_43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d
