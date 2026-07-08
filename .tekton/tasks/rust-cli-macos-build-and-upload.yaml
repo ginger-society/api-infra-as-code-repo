@@ -7,6 +7,7 @@ spec:
   capability: "aarch64-apple-darwin"
   script: |
     #!/bin/bash
+    echo "Starting remote task for aarch64-apple-darwin..."
     set -e
     source /etc/ginger-society/hooks/rpc_creds.sh
     echo "HOME     : $HOME"
