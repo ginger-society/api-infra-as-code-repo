@@ -36,6 +36,15 @@ spec:
     mkdir -p "$CARGO_TARGET_DIR_HOST"
     echo "CARGO_TARGET_DIR_HOST: $CARGO_TARGET_DIR_HOST"
 
+    # ── persistent cargo registry cache, shared across ALL repos/jobs ──────
+    # CARGO_HOME holds the crates.io index + downloaded crate sources —
+    # these are the same regardless of which repo is building, so this is
+    # kept global (not per-repo) to maximize reuse and avoid re-downloading
+    # the same dependency versions on every job.
+    export CARGO_HOME_HOST="${CACHE_HOME}/cargo-home"
+    mkdir -p "$CARGO_HOME_HOST"
+    echo "CARGO_HOME_HOST: $CARGO_HOME_HOST"
+
     ginger-connector connect prod
 
     if [ -d "bin" ]; then
@@ -74,11 +83,12 @@ spec:
     # directly against the checked-out repo, and the resulting ./bin and
     # cargo target dir land straight back on the host — no docker cp needed.
     #
-    # NOTE: the build runs as root inside the container, so files written
-    # into the bind-mounted workspace/cache (bin/, target-linux-arm64/) will
-    # be root-owned on the host afterwards. Not a problem for the
-    # `ginger-infra upload` below, but worth knowing if a later step needs
-    # to read/delete them as a non-root user.
+    # NOTE: the build runs as root inside the container. rpc_creds.sh sets
+    # `umask 0000` for the whole job, so anything newly created under
+    # $HOME/$CACHE_HOME (including these mounted dirs' contents) comes out
+    # world-writable from the start — that's what avoids the permission
+    # errors we hit earlier with plain bind mounts on Docker Desktop's Mac
+    # virtualization layer.
     target="aarch64-unknown-linux-gnu"
     echo "Building for $target..."
 
@@ -86,7 +96,9 @@ spec:
       --platform linux/arm64 \
       -v "$(pwd):/workspace" \
       -v "${CARGO_TARGET_DIR_HOST}:/cargo-target" \
+      -v "${CARGO_HOME_HOST}:/cargo-home" \
       -e "CARGO_TARGET_DIR=/cargo-target" \
+      -e "CARGO_HOME=/cargo-home" \
       -w /workspace \
       gingersociety/rust-cli-builder \
       bash -c "cargo build --release --target ${target} && mkdir -p ./bin/${target} && cp /cargo-target/${target}/release/${executable_name} ./bin/${target}/"
