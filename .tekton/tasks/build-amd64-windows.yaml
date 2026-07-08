@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-amd64-windows
+  namespace: default
+spec:
+  steps:
+    - name: build
+      image: gingersociety/multi-arch-rust-cli-builder:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Building for amd64 windows..."
+        export PATH="/root/.cargo/bin:$PATH"
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        mkdir -p /workspace/general-purpose-cache/target
+        mkdir -p /workspace/general-purpose-cache/cargo
+
+        cd /workspace/source/repo
+
+        ginger-connector connect prod
+
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo
+        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target
+
+        TARGET="x86_64-pc-windows-gnu"
+
+        # ── derive name + version dynamically from Cargo.toml ──────────────
+        package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
+
+        version=$(echo "$package_section" | grep '^version' | awk -F '"' '{print $2}')
+        default_run=$(echo "$package_section" | grep '^default-run' | awk -F '"' '{print $2}')
+
+        if [ -n "$default_run" ]; then
+          executable_name="$default_run"
+        else
+          executable_name=$(echo "$package_section" | grep '^name' | awk -F '"' '{print $2}')
+        fi
+
+        if [ -z "$executable_name" ]; then
+          echo "Could not determine executable name from Cargo.toml"
+          exit 1
+        fi
+        if [ -z "$version" ]; then
+          echo "Could not determine version from Cargo.toml"
+          exit 1
+        fi
+        echo "Building executable: $executable_name (version $version)"
+
+        out_name="${executable_name}.exe"
+        out_dir="./bin/${TARGET}"
+
+        if [ -d "$out_dir" ]; then
+          echo "Deleting existing $out_dir directory..."
+          rm -rf "$out_dir"
+        fi
+        mkdir -p "$out_dir"
+
+        echo "Building for $TARGET..."
+        cargo build --release --target "$TARGET"
+        cp "$CARGO_TARGET_DIR/$TARGET/release/$out_name" "$out_dir/"
+
+        echo "Build complete:"
+        find "$out_dir" -type f
+
+        echo "Uploading $TARGET build..."
+        ginger-infra upload "${executable_name}-binaries/${version}/${TARGET}" "${out_dir}/${out_name}" --overwrite
