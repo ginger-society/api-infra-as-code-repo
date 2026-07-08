@@ -2,28 +2,28 @@
 # tekton-cleanup-cronjob.yaml
 #
 # Nightly cleanup of PipelineRuns (and their pods/PVCs) older
-# than 24h. Runs at 03:15 every day. Metadata/logs are assumed
-# to already be archived elsewhere (Postgres/Loki per
-# teardown.sh's design) — this only deletes live cluster objects.
+# than 24h, across ALL namespaces in the cluster. Runs at 03:15
+# every day. Metadata/logs are assumed to already be archived
+# elsewhere (Postgres/Loki per teardown.sh's design) — this only
+# deletes live cluster objects.
 #
 # Apply with:
 #   kubectl apply -f tekton-cleanup-cronjob.yaml
 #
 # Test it on demand without waiting for the schedule:
 #   kubectl create job --from=cronjob/tekton-pipelinerun-cleanup \
-#     tekton-pipelinerun-cleanup-manual -n default
+#     tekton-pipelinerun-cleanup-manual -n kube-system
 # =============================================================
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: tekton-cleanup
-  namespace: default
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: tekton-cleanup
-  namespace: default
 rules:
   - apiGroups: ["tekton.dev"]
     resources: ["pipelineruns", "taskruns"]
@@ -33,16 +33,15 @@ rules:
     verbs: ["get", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: tekton-cleanup
-  namespace: default
 subjects:
   - kind: ServiceAccount
     name: tekton-cleanup
-    namespace: default
+    namespace: kube-system
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: tekton-cleanup
   apiGroup: rbac.authorization.k8s.io
 ---
@@ -50,29 +49,37 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: tekton-cleanup-script
-  namespace: default
+  namespace: kube-system
 data:
   teardown-old-runs.sh: |
     #!/usr/bin/env bash
     set -euo pipefail
 
     MAX_AGE_HOURS="${MAX_AGE_HOURS:-24}"
-    NAMESPACE="${NAMESPACE:-default}"
+    # Comma-separated list of namespaces to skip entirely, e.g. "kube-system,cert-manager"
+    EXCLUDE_NAMESPACES="${EXCLUDE_NAMESPACES:-}"
     DRY_RUN="${DRY_RUN:-false}"
 
     echo ""
-    echo "  Sweeping PipelineRuns in namespace '${NAMESPACE}' older than ${MAX_AGE_HOURS}h"
+    echo "  Sweeping PipelineRuns in ALL namespaces older than ${MAX_AGE_HOURS}h"
+    [[ -n "$EXCLUDE_NAMESPACES" ]] && echo "  Excluding namespaces: ${EXCLUDE_NAMESPACES}"
     [[ "$DRY_RUN" == "true" ]] && echo "  (dry-run — nothing will actually be deleted)"
     echo ""
 
     NOW_EPOCH=$(date -u +%s)
     CUTOFF_EPOCH=$((NOW_EPOCH - MAX_AGE_HOURS * 3600))
 
-    RUNS_JSON=$(kubectl get pipelinerun -n "$NAMESPACE" -o json 2>/dev/null || echo '{"items":[]}')
-    RUN_COUNT=$(echo "$RUNS_JSON" | jq '.items | length')
+    # Build a jq-friendly exclude array, e.g. ["kube-system","cert-manager"]
+    EXCLUDE_JSON=$(printf '%s\n' "$EXCLUDE_NAMESPACES" \
+      | jq -R -c 'split(",") | map(select(length > 0))')
+
+    RUNS_JSON=$(kubectl get pipelinerun --all-namespaces -o json 2>/dev/null || echo '{"items":[]}')
+    RUN_COUNT=$(echo "$RUNS_JSON" | jq --argjson excl "$EXCLUDE_JSON" '
+      [.items[] | select(.metadata.namespace as $ns | $excl | index($ns) | not)] | length
+    ')
 
     if [[ "$RUN_COUNT" -eq 0 ]]; then
-      echo "  No PipelineRuns found in '${NAMESPACE}'."
+      echo "  No PipelineRuns found (after exclusions)."
       exit 0
     fi
 
@@ -80,11 +87,11 @@ data:
     SKIPPED=0
     FAILED=0
 
-    while IFS=$'\t' read -r run_name ref_epoch; do
+    while IFS=$'\t' read -r ns run_name ref_epoch; do
       [[ -z "$run_name" ]] && continue
 
       if [[ -z "$ref_epoch" || "$ref_epoch" == "null" ]]; then
-        echo "  — ${run_name}: could not parse timestamp, skipping"
+        echo "  — ${ns}/${run_name}: could not parse timestamp, skipping"
         SKIPPED=$((SKIPPED + 1))
         continue
       fi
@@ -95,41 +102,43 @@ data:
       fi
 
       age_hours=$(( (NOW_EPOCH - ref_epoch) / 3600 ))
-      echo "  → ${run_name} (age: ${age_hours}h) — tearing down"
+      echo "  → ${ns}/${run_name} (age: ${age_hours}h) — tearing down"
 
       if [[ "$DRY_RUN" == "true" ]]; then
-        echo "      [dry-run] would delete pipelinerun/pods/pvcs for ${run_name}"
+        echo "      [dry-run] would delete pipelinerun/pods/pvcs for ${ns}/${run_name}"
         continue
       fi
 
-      if kubectl get pipelinerun "$run_name" -n "$NAMESPACE" &>/dev/null; then
-        if kubectl delete pipelinerun "$run_name" -n "$NAMESPACE" --ignore-not-found; then
-          echo "      ✓ deleted PipelineRun/${run_name}"
+      if kubectl get pipelinerun "$run_name" -n "$ns" &>/dev/null; then
+        if kubectl delete pipelinerun "$run_name" -n "$ns" --ignore-not-found; then
+          echo "      ✓ deleted PipelineRun/${run_name} in ${ns}"
         else
-          echo "      ✗ failed to delete PipelineRun/${run_name}"
+          echo "      ✗ failed to delete PipelineRun/${run_name} in ${ns}"
           FAILED=$((FAILED + 1))
           continue
         fi
       fi
 
-      if kubectl get pods -n "$NAMESPACE" -l "tekton.dev/pipelineRun=${run_name}" \
+      if kubectl get pods -n "$ns" -l "tekton.dev/pipelineRun=${run_name}" \
           --no-headers 2>/dev/null | grep -q .; then
-        kubectl delete pods -n "$NAMESPACE" \
+        kubectl delete pods -n "$ns" \
           -l "tekton.dev/pipelineRun=${run_name}" --ignore-not-found
-        echo "      ✓ deleted pods for ${run_name}"
+        echo "      ✓ deleted pods for ${ns}/${run_name}"
       fi
 
-      if kubectl get pvc -n "$NAMESPACE" -l "tekton.dev/pipelineRun=${run_name}" \
+      if kubectl get pvc -n "$ns" -l "tekton.dev/pipelineRun=${run_name}" \
           --no-headers 2>/dev/null | grep -q .; then
-        kubectl delete pvc -n "$NAMESPACE" \
+        kubectl delete pvc -n "$ns" \
           -l "tekton.dev/pipelineRun=${run_name}" --ignore-not-found
-        echo "      ✓ deleted PVCs for ${run_name}"
+        echo "      ✓ deleted PVCs for ${ns}/${run_name}"
       fi
 
       DELETED=$((DELETED + 1))
-    done < <(echo "$RUNS_JSON" | jq -r '
+    done < <(echo "$RUNS_JSON" | jq -r --argjson excl "$EXCLUDE_JSON" '
       .items[] |
+      select(.metadata.namespace as $ns | $excl | index($ns) | not) |
       [
+        .metadata.namespace,
         .metadata.name,
         (
           (.status.completionTime // .metadata.creationTimestamp // "") as $t |
@@ -152,7 +161,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: tekton-pipelinerun-cleanup
-  namespace: default
+  namespace: kube-system
 spec:
   # 03:15 every day — adjust to taste. Cluster-local time of the
   # kube-controller-manager, which is normally UTC.
@@ -175,8 +184,8 @@ spec:
               env:
                 - name: MAX_AGE_HOURS
                   value: "24"
-                - name: NAMESPACE
-                  value: "default"
+                - name: EXCLUDE_NAMESPACES
+                  value: ""
                 - name: DRY_RUN
                   value: "false"
               volumeMounts:

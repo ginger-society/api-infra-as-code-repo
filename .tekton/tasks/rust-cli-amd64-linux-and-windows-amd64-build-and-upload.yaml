@@ -11,7 +11,7 @@ spec:
       script: |
         #!/bin/bash
         set -e
-        echo "Starting build for amd64 linux and windows..."
+        echo "Building for amd64 linux and windows..."
         export PATH="/root/.cargo/bin:$PATH"
         /usr/local/bin/mount-ginger-credentials.sh
 
