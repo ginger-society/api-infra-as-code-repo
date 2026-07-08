@@ -1,0 +1,89 @@
+apiVersion: gingersociety.org/v1alpha1
+kind: RemoteTask
+metadata:
+  name: macos-builds
+  namespace: default
+spec:
+  capability: "aarch64-apple-darwin"
+  script: |
+    #!/bin/bash
+    set -e
+    source /etc/ginger-society/hooks/rpc_creds.sh
+    echo "HOME     : $HOME"
+    echo "USER     : $USER"
+    echo "GIT_REPO_NAME: $GIT_REPO_NAME"
+    echo "IMAGE_TAG: $IMAGE_TAG"
+
+    cd "$HOME"
+    REPO_URL="git@source.gingersociety.org:${GIT_REPO_NAME}.git"
+    CLONE_DIR="${GIT_REPO_NAME}"
+
+    echo "Cloning ${REPO_URL} into ${CLONE_DIR}..."
+    rm -rf "$CLONE_DIR"
+    git clone "$REPO_URL" "$CLONE_DIR"
+
+    cd "$CLONE_DIR"
+    echo "Cloned repo, current commit:"
+    git log -1 --oneline
+
+    ginger-connector connect prod
+
+    if [ -d "bin" ]; then
+      echo "Deleting existing bin directory..."
+      rm -rf bin
+    fi
+
+    # ── derive name + version dynamically from Cargo.toml ──────────────
+    # Scope to the [package] section only, so a multi-bin crate's [[bin]]
+    # "name" entries don't get picked up by mistake. Prefer default-run
+    # (the "main" binary for the package) and fall back to the package
+    # name when default-run isn't set.
+    package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
+
+    version=$(echo "$package_section" | grep '^version' | awk -F '"' '{print $2}')
+    default_run=$(echo "$package_section" | grep '^default-run' | awk -F '"' '{print $2}')
+
+    if [ -n "$default_run" ]; then
+      executable_name="$default_run"
+    else
+      executable_name=$(echo "$package_section" | grep '^name' | awk -F '"' '{print $2}')
+    fi
+
+    if [ -z "$executable_name" ]; then
+      echo "Could not determine executable name from Cargo.toml"
+      exit 1
+    fi
+    if [ -z "$version" ]; then
+      echo "Could not determine version from Cargo.toml"
+      exit 1
+    fi
+    echo "Building executable: $executable_name (version $version)"
+
+    # ── macOS builds native on this runner (arm64 + amd64 cross) ──────────
+    # aarch64-unknown-linux-gnu is now built separately in the
+    # docker-arm64-linux-build task, to avoid running two concurrent
+    # cargo build processes (and their parallel workers) on this same
+    # physical host at once.
+    macos_targets=(
+      "aarch64-apple-darwin"
+      "x86_64-apple-darwin"
+    )
+
+    for target in "${macos_targets[@]}"; do
+      echo "Building for $target..."
+      cargo build --release --target "$target"
+      mkdir -p "./bin/$target"
+      cp "target/$target/release/$executable_name" "./bin/$target/"
+    done
+
+    echo "Build complete:"
+    find bin -type f
+
+    for target in "${macos_targets[@]}"; do
+      echo "Uploading $target build..."
+      ginger-infra upload "${executable_name}-binaries/${version}/${target}" "bin/${target}/${executable_name}" --overwrite
+    done
+  cleanup: |
+    #!/bin/bash
+    echo "cleanup: nothing to do"
+  env: []

@@ -1,0 +1,90 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-amd64-linux-and-windows
+  namespace: default
+spec:
+  steps:
+    - name: build
+      image: gingersociety/multi-arch-rust-cli-builder:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        export PATH="/root/.cargo/bin:$PATH"
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        mkdir -p /workspace/general-purpose-cache/target
+        mkdir -p /workspace/general-purpose-cache/cargo
+
+        cd /workspace/source/repo
+
+        ginger-connector connect prod
+
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo
+        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target
+
+        # ── derive name + version dynamically from Cargo.toml ──────────────
+        # Scope to the [package] section only, so a multi-bin crate's [[bin]]
+        # "name" entries don't get picked up by mistake. Prefer default-run
+        # (the "main" binary for the package) and fall back to the package
+        # name when default-run isn't set.
+        package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
+
+        version=$(echo "$package_section" | grep '^version' | awk -F '"' '{print $2}')
+        default_run=$(echo "$package_section" | grep '^default-run' | awk -F '"' '{print $2}')
+
+        if [ -n "$default_run" ]; then
+          executable_name="$default_run"
+        else
+          executable_name=$(echo "$package_section" | grep '^name' | awk -F '"' '{print $2}')
+        fi
+
+        if [ -z "$executable_name" ]; then
+          echo "Could not determine executable name from Cargo.toml"
+          exit 1
+        fi
+        if [ -z "$version" ]; then
+          echo "Could not determine version from Cargo.toml"
+          exit 1
+        fi
+        echo "Building executable: $executable_name (version $version)"
+
+        if [ -d "bin" ]; then
+          echo "Deleting existing bin directory..."
+          rm -rf bin
+        fi
+
+        # ── amd64 linux + windows, built natively on this amd64 host using
+        #    the cross-toolchains baked into the builder image ──────────────
+        linux_targets=(
+          "x86_64-unknown-linux-gnu"
+          "x86_64-pc-windows-gnu"
+        )
+
+        output_name_for() {
+          local target=$1
+          if [ "$target" == "x86_64-pc-windows-gnu" ]; then
+            echo "${executable_name}.exe"
+          else
+            echo "${executable_name}"
+          fi
+        }
+
+        for target in "${linux_targets[@]}"; do
+          echo "Building for $target..."
+          cargo build --release --target "$target"
+
+          out_name=$(output_name_for "$target")
+          mkdir -p "./bin/$target"
+          cp "$CARGO_TARGET_DIR/$target/release/$out_name" "./bin/$target/"
+        done
+
+        echo "Build complete:"
+        find bin -type f
+
+        for target in "${linux_targets[@]}"; do
+          echo "Uploading $target build..."
+          out_name=$(output_name_for "$target")
+          ginger-infra upload "${executable_name}-binaries/${version}/${target}" "bin/${target}/${out_name}" --overwrite
+        done
