@@ -22,8 +22,11 @@ spec:
 
         ginger-connector connect prod
 
-        export CARGO_HOME=/workspace/general-purpose-cache/cargo
-        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo-windows
+        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target-windows
+
+        mkdir -p /workspace/general-purpose-cache/target-windows
+        mkdir -p /workspace/general-purpose-cache/cargo-windows
 
         TARGET="x86_64-pc-windows-gnu"
 

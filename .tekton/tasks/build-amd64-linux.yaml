@@ -22,8 +22,11 @@ spec:
 
         ginger-connector connect prod
 
-        export CARGO_HOME=/workspace/general-purpose-cache/cargo
-        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo-linux
+        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target-linux
+
+        mkdir -p /workspace/general-purpose-cache/target-linux
+        mkdir -p /workspace/general-purpose-cache/cargo-linux
 
         TARGET="x86_64-unknown-linux-gnu"
 
