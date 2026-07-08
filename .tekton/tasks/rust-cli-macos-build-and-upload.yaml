@@ -29,6 +29,14 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
+    # ── persistent build cache, keyed by repo ───────────────────────────────
+    # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
+    # runs on this runner — reuse it for Cargo's target dir so incremental
+    # compilation actually has something to incrementally build on.
+    export CARGO_TARGET_DIR="${CACHE_HOME}/${GIT_REPO_NAME}/target"
+    mkdir -p "$CARGO_TARGET_DIR"
+    echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
+
     ginger-connector connect prod
 
     if [ -d "bin" ]; then
@@ -76,7 +84,7 @@ spec:
       echo "Building for $target..."
       cargo build --release --target "$target"
       mkdir -p "./bin/$target"
-      cp "target/$target/release/$executable_name" "./bin/$target/"
+      cp "$CARGO_TARGET_DIR/$target/release/$executable_name" "./bin/$target/"
     done
 
     echo "Build complete:"

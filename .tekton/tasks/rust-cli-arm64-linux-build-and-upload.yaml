@@ -28,6 +28,14 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
+    # ── persistent build cache, keyed by repo ───────────────────────────────
+    # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
+    # runs on this runner — bind-mount it into the container so Cargo's
+    # target dir survives across jobs instead of rebuilding from scratch.
+    export CARGO_TARGET_DIR_HOST="${CACHE_HOME}/${GIT_REPO_NAME}/target-linux-arm64"
+    mkdir -p "$CARGO_TARGET_DIR_HOST"
+    echo "CARGO_TARGET_DIR_HOST: $CARGO_TARGET_DIR_HOST"
+
     ginger-connector connect prod
 
     if [ -d "bin" ]; then
@@ -62,21 +70,26 @@ spec:
     echo "Building executable: $executable_name (version $version)"
 
     # ── aarch64-unknown-linux-gnu via docker (native arm64 on this runner) ──
-    # Source is copied INTO the container (not bind-mounted) so this build gets
-    # its own isolated /workspace, unaffected by anything else on this host.
+    # Source is bind-mounted (not copied in/out) so the container builds
+    # directly against the checked-out repo, and the resulting ./bin and
+    # cargo target dir land straight back on the host — no docker cp needed.
+    #
+    # NOTE: the build runs as root inside the container, so files written
+    # into the bind-mounted workspace/cache (bin/, target-linux-arm64/) will
+    # be root-owned on the host afterwards. Not a problem for the
+    # `ginger-infra upload` below, but worth knowing if a later step needs
+    # to read/delete them as a non-root user.
     target="aarch64-unknown-linux-gnu"
     echo "Building for $target..."
 
-    container_id=$(docker create --platform linux/arm64 gingersociety/rust-cli-builder \
-      bash -c "cd /workspace && cargo build --release --target ${target} && mkdir -p ./bin/${target} && cp target/${target}/release/${executable_name} ./bin/${target}/")
-
-    docker cp . "${container_id}:/workspace"
-    docker start -a "${container_id}"
-
-    mkdir -p "./bin/${target}"
-    docker cp "${container_id}:/workspace/bin/${target}/${executable_name}" "./bin/${target}/"
-
-    docker rm "${container_id}" >/dev/null
+    docker run --rm \
+      --platform linux/arm64 \
+      -v "$(pwd):/workspace" \
+      -v "${CARGO_TARGET_DIR_HOST}:/cargo-target" \
+      -e "CARGO_TARGET_DIR=/cargo-target" \
+      -w /workspace \
+      gingersociety/rust-cli-builder \
+      bash -c "cargo build --release --target ${target} && mkdir -p ./bin/${target} && cp /cargo-target/${target}/release/${executable_name} ./bin/${target}/"
 
     echo "Build complete:"
     find bin -type f
