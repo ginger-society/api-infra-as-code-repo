@@ -16,6 +16,8 @@ spec:
     echo "IMAGE_TAG: $IMAGE_TAG"
 
     cd "$HOME"
+    export TMPDIR="$HOME/.tmp"
+    mkdir -p "$TMPDIR"
     REPO_URL="git@source.gingersociety.org:${GIT_REPO_NAME}.git"
     CLONE_DIR="${GIT_REPO_NAME}"
 
