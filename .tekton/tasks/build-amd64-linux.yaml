@@ -8,6 +8,9 @@ spec:
     - name: binaries_to_build
       type: string
       default: ""
+    - name: binaries_to_upload
+      type: string
+      default: ""
   steps:
     - name: build
       image: gingersociety/multi-arch-rust-cli-builder:latest
@@ -69,6 +72,29 @@ spec:
           bin_flags+=(--bin "$b")
         done
 
+        # ── which built binaries to actually upload ──────────────────────────
+        # binaries_to_upload is a CSV of bin names. If unset/empty, defaults to
+        # everything in binaries_to_build. Anything listed here that wasn't
+        # actually built (i.e. not in BINARIES) is silently dropped, so this
+        # can never upload a binary that wasn't built.
+        BINARIES_TO_UPLOAD="$(params.binaries_to_upload)"
+        IFS=',' read -ra UPLOAD_BINARIES <<< "$BINARIES_TO_UPLOAD"
+        if [ ${#UPLOAD_BINARIES[@]} -eq 0 ] || [ -z "${UPLOAD_BINARIES[0]}" ]; then
+          UPLOAD_BINARIES=("${BINARIES[@]}")
+        fi
+
+        FILTERED_UPLOAD_BINARIES=()
+        for u in "${UPLOAD_BINARIES[@]}"; do
+          for b in "${BINARIES[@]}"; do
+            if [ "$u" == "$b" ]; then
+              FILTERED_UPLOAD_BINARIES+=("$u")
+              break
+            fi
+          done
+        done
+        UPLOAD_BINARIES=("${FILTERED_UPLOAD_BINARIES[@]}")
+        echo "Binaries to upload: ${UPLOAD_BINARIES[*]}"
+
         out_dir="./bin/${TARGET}"
 
         if [ -d "$out_dir" ]; then
@@ -87,7 +113,7 @@ spec:
         echo "Build complete:"
         find "$out_dir" -type f
 
-        for b in "${BINARIES[@]}"; do
+        for b in "${UPLOAD_BINARIES[@]}"; do
           echo "Uploading ${b} (${TARGET}) build..."
           ginger-infra upload "${executable_name}-binaries/${version}/${TARGET}" "${out_dir}/${b}" --overwrite
         done

@@ -16,6 +16,7 @@ spec:
     echo "GIT_REPO_NAME: $GIT_REPO_NAME"
     echo "IMAGE_TAG: $IMAGE_TAG"
     echo "BINARIES_TO_BUILD: $BINARIES_TO_BUILD"
+    echo "BINARIES_TO_UPLOAD: $BINARIES_TO_UPLOAD"
     cd "$HOME"
     ls -la
     pwd
@@ -94,6 +95,28 @@ spec:
       bin_flags="${bin_flags} --bin ${b}"
     done
 
+    # ── which built binaries to actually upload ──────────────────────────
+    # BINARIES_TO_UPLOAD is a CSV of bin names. If unset/empty, defaults to
+    # everything in BINARIES_TO_BUILD. Anything listed here that wasn't
+    # actually built (i.e. not in BINARIES) is silently dropped, so this
+    # can never upload a binary that wasn't built.
+    IFS=',' read -ra UPLOAD_BINARIES <<< "${BINARIES_TO_UPLOAD:-}"
+    if [ ${#UPLOAD_BINARIES[@]} -eq 0 ] || [ -z "${UPLOAD_BINARIES[0]}" ]; then
+      UPLOAD_BINARIES=("${BINARIES[@]}")
+    fi
+
+    FILTERED_UPLOAD_BINARIES=()
+    for u in "${UPLOAD_BINARIES[@]}"; do
+      for b in "${BINARIES[@]}"; do
+        if [ "$u" == "$b" ]; then
+          FILTERED_UPLOAD_BINARIES+=("$u")
+          break
+        fi
+      done
+    done
+    UPLOAD_BINARIES=("${FILTERED_UPLOAD_BINARIES[@]}")
+    echo "Binaries to upload: ${UPLOAD_BINARIES[*]}"
+
     # ── aarch64-unknown-linux-gnu via docker (native arm64 on this runner) ──
     # Source is bind-mounted (not copied in/out) so the container builds
     # directly against the checked-out repo, and the resulting ./bin and
@@ -122,7 +145,7 @@ spec:
     echo "Build complete:"
     find bin -type f
 
-    for b in "${BINARIES[@]}"; do
+    for b in "${UPLOAD_BINARIES[@]}"; do
       echo "Uploading ${b} (${target}) build..."
       ginger-infra upload "${executable_name}-binaries/${version}/${target}" "bin/${target}/${b}" --overwrite
     done
