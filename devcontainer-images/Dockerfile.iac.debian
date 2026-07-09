@@ -1,0 +1,58 @@
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server \
+    bash \
+    zsh \
+    curl \
+    wget \
+    sudo \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+
+# Install k9s
+RUN curl -L "https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin k9s \
+    && chmod +x /usr/local/bin/k9s
+
+WORKDIR /workspace
+
+RUN useradd -m -s /bin/zsh dev \
+    && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && chown -R dev:dev /home/dev \
+    && chown dev:dev /workspace
+
+COPY signing-keys/ca_key.pub /etc/ssh/ca_key.pub
+RUN chmod 644 /etc/ssh/ca_key.pub
+
+RUN mkdir -p /etc/ssh/auth_principals \
+    && chmod 755 /etc/ssh/auth_principals
+
+RUN cat >> /etc/ssh/sshd_config <<'SSHEOF'
+
+TrustedUserCAKeys /etc/ssh/ca_key.pub
+AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PermitUserEnvironment yes
+SSHEOF
+
+RUN ssh-keygen -A \
+    && mkdir -p /run/sshd
+
+RUN cat > /entrypoint.sh <<'EOF'
+#!/bin/sh
+printenv | grep -v -E '^(HOME|USER|LOGNAME|SHELL|MAIL|PATH)=' \
+    | while IFS= read -r line; do
+        echo "$line" >> /etc/environment
+    done
+exec /usr/sbin/sshd -D -e -p ${SSH_PORT:-22}
+EOF
+RUN chmod +x /entrypoint.sh

@@ -1,0 +1,159 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-images-pipeline
+  annotations:
+    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
+    x-gitter-enabled: "true"
+spec:
+  tasks:
+    # ─────────────── pipeline-images/rust-rocket-api ───────────────
+    - name: build-push-rust-rocket-builder
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/rust-rocket-api-builder"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "pipeline-images/rust-rocket-api/Dockerfile.builder"
+        - name: build_context
+          value: "."
+
+    - name: build-push-rust-rocket-runner
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/rust-rocket-api-runner"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "pipeline-images/rust-rocket-api/Dockerfile.runner"
+        - name: build_context
+          value: "."
+
+    - name: build-push-vite-react-builder
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/vite-react-builder"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "pipeline-images/vite-react/Dockerfile.builder"
+        - name: build_context
+          value: "."
+
+    # ─────────────────────── devcontainer-images ───────────────────────
+    - name: build-push-devcontainer-node
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/dev-container-node"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "devcontainer-images/Dockerfile.node.debian"
+        - name: build_context
+          value: "."
+
+    - name: build-push-devcontainer-rust
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/dev-container-rust"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "devcontainer-images/Dockerfile.rust.bullseye"
+        - name: build_context
+          value: "."
+
+    - name: build-push-devcontainer-iac
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "ginger-society/dev-iac"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "devcontainer-images/Dockerfile.iac.debian"
+        - name: build_context
+          value: "."
+
+    # ─────────────────────────── wrap-up ───────────────────────────
+    - name: notify-version-update
+      runAfter:
+        - build-push-rust-rocket-builder
+        - build-push-rust-rocket-runner
+        - build-push-vite-react-builder
+        - build-push-devcontainer-node
+        - build-push-devcontainer-rust
+        - build-push-devcontainer-iac
+      taskSpec:
+        steps:
+          - name: echo
+            image: alpine
+            script: |
+              #!/bin/sh
+              echo "Hello World - all image builds are done!"

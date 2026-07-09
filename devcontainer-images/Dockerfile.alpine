@@ -1,0 +1,30 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache openssh bash
+
+# Create user vriksh — disabled password but unlocked account
+RUN adduser -D -s /bin/bash vriksh && \
+    passwd -u vriksh || true
+
+# CA public key
+COPY signing-keys/ca_key.pub /etc/ssh/ca_key.pub
+RUN chmod 644 /etc/ssh/ca_key.pub
+
+# Principals file
+RUN mkdir -p /etc/ssh/auth_principals && \
+    echo "vriksh" > /etc/ssh/auth_principals/vriksh && \
+    chmod 644 /etc/ssh/auth_principals/vriksh
+
+# Patch sshd_config
+RUN cat >> /etc/ssh/sshd_config <<'EOF'
+
+TrustedUserCAKeys /etc/ssh/ca_key.pub
+AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+PasswordAuthentication no
+EOF
+
+# Generate host keys
+RUN ssh-keygen -A
+
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

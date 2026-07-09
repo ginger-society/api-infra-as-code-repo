@@ -1,0 +1,90 @@
+FROM debian:bullseye-slim
+
+WORKDIR /workspace
+
+# ── System packages ────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server \
+    git zsh curl nano make gcc wget \
+    build-essential procps unzip sudo \
+    default-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Oh My Zsh ──────────────────────────────────────────────────────────────────
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
+# ── Zsh theme: af-magic ───────────────────────────────────────────────────────
+RUN sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' /root/.zshrc
+
+# ── Default shell hint (non-login shells) ─────────────────────────────────────
+RUN echo "zsh" >> /root/.bashrc
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_current.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Ginger CLIs ───────────────────────────────────────────────────────────────
+RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra-as-code-repo/main/rust-helpers/install-all-clis.sh)"
+
+# ── Global npm tools ──────────────────────────────────────────────────────────
+RUN npm install -g yarn @openapitools/openapi-generator-cli
+RUN openapi-generator-cli version
+
+# ── AWS CLI ───────────────────────────────────────────────────────────────────
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# ── Create the dev user (non-root, with sudo) ─────────────────────────────────
+RUN useradd -m -s /bin/zsh dev \
+    && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && chown -R dev:dev /home/dev \
+    && chown dev:dev /workspace
+
+# ── Zsh theme for dev user ────────────────────────────────────────────────────
+RUN cp /root/.zshrc /home/dev/.zshrc \
+    && chown dev:dev /home/dev/.zshrc
+
+# ── Oh My Zsh for dev user ────────────────────────────────────────────────────
+RUN cp -r /root/.oh-my-zsh /home/dev/.oh-my-zsh \
+    && cp /root/.zshrc /home/dev/.zshrc \
+    && sed -i 's|export ZSH=.*|export ZSH="/home/dev/.oh-my-zsh"|' /home/dev/.zshrc \
+    && chown -R dev:dev /home/dev/.oh-my-zsh /home/dev/.zshrc
+
+# ── SSH: CA key (baked in at build time) ─────────────────────────────────────
+COPY signing-keys/ca_key.pub /etc/ssh/ca_key.pub
+RUN chmod 644 /etc/ssh/ca_key.pub
+
+# ── SSH: principals dir (populated at eject time via kubectl exec) ────────────
+RUN mkdir -p /etc/ssh/auth_principals \
+    && chmod 755 /etc/ssh/auth_principals
+
+# ── SSH: sshd_config ──────────────────────────────────────────────────────────
+RUN cat >> /etc/ssh/sshd_config <<'SSHEOF'
+
+TrustedUserCAKeys /etc/ssh/ca_key.pub
+AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PermitUserEnvironment yes
+SSHEOF
+
+# ── SSH: generate host keys + ensure runtime dir exists ───────────────────────
+RUN ssh-keygen -A \
+    && mkdir -p /run/sshd
+
+# ── Entrypoint: dump all pod env vars then start sshd ─────────────────────────
+RUN cat > /entrypoint.sh <<'EOF'
+#!/bin/sh
+printenv | grep -v -E '^(HOME|USER|LOGNAME|SHELL|MAIL|PATH)=' \
+    | while IFS= read -r line; do
+        echo "$line" >> /etc/environment
+    done
+exec /usr/sbin/sshd -D -e
+EOF
+RUN chmod +x /entrypoint.sh
+
+# ── No CMD — k8s deployment command drives startup: ["/entrypoint.sh"]

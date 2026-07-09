@@ -1,0 +1,95 @@
+FROM rust:1-slim-bullseye
+
+WORKDIR /workspace
+
+# ── System packages ────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server \
+    curl zsh nano docker.io \
+    pkg-config libssl-dev \
+    gcc-mingw-w64-x86-64 \
+    libpq-dev \
+    build-essential procps unzip sudo \
+    default-jdk \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Oh My Zsh (root) ──────────────────────────────────────────────────────────
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \
+    && sed -i 's/ZSH_THEME="robbyrussell"/ZSH_THEME="af-magic"/' /root/.zshrc \
+    && echo "zsh" >> /root/.bashrc
+
+# ── Rust targets & components ─────────────────────────────────────────────────
+RUN rustup target add x86_64-pc-windows-gnu \
+    && rustup component add rustfmt clippy rust-analyzer
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+RUN curl -fsSL https://deb.nodesource.com/setup_current.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Global npm tools ──────────────────────────────────────────────────────────
+RUN npm install -g @openapitools/openapi-generator-cli \
+    && openapi-generator-cli version
+
+# ── Ginger CLIs ───────────────────────────────────────────────────────────────
+RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra-as-code-repo/main/rust-helpers/install-all-clis.sh)"
+
+# ── Dev user ──────────────────────────────────────────────────────────────────
+RUN useradd -m -s /bin/zsh dev \
+    && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && chown -R dev:dev /home/dev \
+    && chown dev:dev /workspace
+
+# ── Oh My Zsh (dev user) ──────────────────────────────────────────────────────
+RUN cp -r /root/.oh-my-zsh /home/dev/.oh-my-zsh \
+    && cp /root/.zshrc /home/dev/.zshrc \
+    && sed -i 's|export ZSH=.*|export ZSH="/home/dev/.oh-my-zsh"|' /home/dev/.zshrc \
+    && chown -R dev:dev /home/dev/.oh-my-zsh /home/dev/.zshrc
+
+# ── Rust env for all users ────────────────────────────────────────────────────
+RUN echo 'export RUSTUP_HOME=/usr/local/rustup' >> /etc/zsh/zshenv \
+    && echo 'export CARGO_HOME=/usr/local/cargo' >> /etc/zsh/zshenv \
+    && echo 'export PATH=/usr/local/cargo/bin:$PATH' >> /etc/zsh/zshenv \
+    && echo 'export RUSTUP_HOME=/usr/local/rustup' >> /etc/profile.d/rust.sh \
+    && echo 'export CARGO_HOME=/usr/local/cargo' >> /etc/profile.d/rust.sh \
+    && echo 'export PATH=/usr/local/cargo/bin:$PATH' >> /etc/profile.d/rust.sh
+
+# ── Default shell for VS Code terminal ────────────────────────────────────────
+RUN echo 'SHELL=/bin/zsh' >> /etc/environment
+
+# ── SSH: CA key ───────────────────────────────────────────────────────────────
+COPY signing-keys/ca_key.pub /etc/ssh/ca_key.pub
+RUN chmod 644 /etc/ssh/ca_key.pub
+
+# ── SSH: principals dir ───────────────────────────────────────────────────────
+RUN mkdir -p /etc/ssh/auth_principals \
+    && chmod 755 /etc/ssh/auth_principals
+
+# ── SSH: sshd_config ──────────────────────────────────────────────────────────
+RUN cat >> /etc/ssh/sshd_config <<'SSHEOF'
+
+TrustedUserCAKeys /etc/ssh/ca_key.pub
+AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin no
+PermitUserEnvironment yes
+SSHEOF
+
+# ── SSH: host keys ────────────────────────────────────────────────────────────
+RUN ssh-keygen -A \
+    && mkdir -p /run/sshd
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+RUN cat > /entrypoint.sh <<'EOF'
+#!/bin/sh
+printenv | grep -v -E '^(HOME|USER|LOGNAME|SHELL|MAIL|PATH)=' \
+    | while IFS= read -r line; do
+        echo "$line" >> /etc/environment
+    done
+exec /usr/sbin/sshd -D -e -p ${SSH_PORT:-22}
+EOF
+RUN chmod +x /entrypoint.sh
+
+# ── No CMD — k8s deployment command drives startup: ["/entrypoint.sh"]

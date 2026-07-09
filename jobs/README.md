@@ -21,5 +21,13 @@ docker build -t gingersociety/enhanced-node-builder:latest --platform=linux/amd6
 docker push gingersociety/enhanced-node-builder:latest
 
 
+docker build --progress=plain -t gingersociety/multi-arch-rust-cli-builder:latest --platform=linux/amd64 -f multi-arch-rust-cli.Dockerfile .
+docker push gingersociety/multi-arch-rust-cli-builder:latest
+
+
+docker build --progress=plain -t gingersociety/k8-controller-and-runner-base:latest --platform=linux/amd64 -f k8-controller-and-runner.Dockerfile .
+docker push gingersociety/k8-controller-and-runner-base:latest
+
+
 
 

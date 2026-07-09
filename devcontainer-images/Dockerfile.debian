@@ -1,0 +1,36 @@
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server \
+    bash \
+    curl \
+    wget \
+    sudo \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash test_user && \
+    passwd -u test_user || true
+
+# Give test_user passwordless sudo
+RUN echo "test_user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+COPY signing-keys/ca_key.pub /etc/ssh/ca_key.pub
+RUN chmod 644 /etc/ssh/ca_key.pub
+
+RUN mkdir -p /etc/ssh/auth_principals && \
+    echo "test_user" > /etc/ssh/auth_principals/test_user && \
+    chmod 644 /etc/ssh/auth_principals/test_user
+
+RUN cat >> /etc/ssh/sshd_config <<'EOF'
+
+TrustedUserCAKeys /etc/ssh/ca_key.pub
+AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
+PasswordAuthentication no
+EOF
+
+RUN mkdir -p /run/sshd
+RUN ssh-keygen -A
+
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D", "-e"]

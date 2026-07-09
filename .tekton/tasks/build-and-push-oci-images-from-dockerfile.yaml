@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push-dockerfile-image
+  namespace: default
+spec:
+  params:
+    - name: image_repo
+      type: string
+      # e.g. "ginger-society/rust-rocket-api-builder"
+      # gets prefixed with the hardcoded registry below
+    - name: image_tag
+      type: string
+      default: "latest"
+    - name: dockerfile_path
+      type: string
+    - name: build_context
+      type: string
+      default: "."
+    - name: build_args
+      type: array
+      default: []
+      # Each entry is a "KEY=VALUE" pair, e.g. "SOME_ARG=value"
+  steps:
+    - name: build-and-push
+      image: gingersociety/tekton-task-buildah:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export XDG_RUNTIME_DIR=/workspace/buildah-cache/runtime
+        export CONTAINERS_STORAGE=/workspace/buildah-cache/storage
+        export CONTAINERS_STORAGE_CONF=/workspace/buildah-cache/storage.conf
+
+        /usr/local/bin/configure_buildah.sh
+        /usr/local/bin/mount-docker-credentials.sh
+
+        cd /workspace/source/repo
+
+        REGISTRY="docker.gingersociety.org"
+        FINAL_IMAGE="$REGISTRY/$(params.image_repo):$(params.image_tag)"
+
+        BUILD_ARGS_FLAGS=""
+        for arg in $(params.build_args[*]); do
+          BUILD_ARGS_FLAGS="$BUILD_ARGS_FLAGS --build-arg $arg"
+        done
+
+        buildah bud \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          -f "$(params.dockerfile_path)" \
+          -t "$FINAL_IMAGE" \
+          $BUILD_ARGS_FLAGS \
+          "$(params.build_context)"
+
+        buildah push \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          --authfile ~/.docker/config.json \
+          "$FINAL_IMAGE"
+
+        echo "Image pushed successfully: $FINAL_IMAGE"
+      securityContext:
+        privileged: true
