@@ -124,7 +124,7 @@ spec:
 
     for b in "${BINARIES[@]}"; do
       echo "Uploading ${b} (${target}) build..."
-      ginger-infra upload "${executable_name}-binaries/${version}/${target}/${b}" "bin/${target}/${b}" --overwrite
+      ginger-infra upload "${executable_name}-binaries/${version}/${target}" "bin/${target}/${b}" --overwrite
     done
   cleanup: |
     #!/bin/bash
