@@ -7,8 +7,6 @@ spec:
   params:
     - name: image_repo
       type: string
-      # e.g. "ginger-society/rust-rocket-api-builder"
-      # gets prefixed with the hardcoded registry below
     - name: image_tag
       type: string
       default: "latest"
@@ -20,11 +18,12 @@ spec:
     - name: build_args
       type: array
       default: []
-      # Each entry is a "KEY=VALUE" pair, e.g. "SOME_ARG=value"
   steps:
     - name: build-and-push
       image: gingersociety/tekton-task-buildah:latest
       imagePullPolicy: Always
+      args:
+        - "$(params.build_args[*])"
       script: |
         #!/bin/bash
         set -e
@@ -42,7 +41,7 @@ spec:
         FINAL_IMAGE="$REGISTRY/$(params.image_repo):$(params.image_tag)"
 
         BUILD_ARGS_FLAGS=""
-        for arg in $(params.build_args[*]); do
+        for arg in "$@"; do
           BUILD_ARGS_FLAGS="$BUILD_ARGS_FLAGS --build-arg $arg"
         done
 
