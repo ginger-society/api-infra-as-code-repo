@@ -4,6 +4,10 @@ metadata:
   name: build-amd64-windows
   namespace: default
 spec:
+  params:
+    - name: binaries_to_build
+      type: string
+      default: ""
   steps:
     - name: build
       image: gingersociety/multi-arch-rust-cli-builder:latest
@@ -52,7 +56,19 @@ spec:
         fi
         echo "Building executable: $executable_name (version $version)"
 
-        out_name="${executable_name}.exe"
+        # ── which [[bin]] targets to build ──────────────────────────────────
+        BINARIES_TO_BUILD="$(params.binaries_to_build)"
+        IFS=',' read -ra BINARIES <<< "$BINARIES_TO_BUILD"
+        if [ ${#BINARIES[@]} -eq 0 ] || [ -z "${BINARIES[0]}" ]; then
+          BINARIES=("$executable_name")
+        fi
+        echo "Binaries to build: ${BINARIES[*]}"
+
+        bin_flags=()
+        for b in "${BINARIES[@]}"; do
+          bin_flags+=(--bin "$b")
+        done
+
         out_dir="./bin/${TARGET}"
 
         if [ -d "$out_dir" ]; then
@@ -62,11 +78,16 @@ spec:
         mkdir -p "$out_dir"
 
         echo "Building for $TARGET..."
-        cargo build --release --target "$TARGET"
-        cp "$CARGO_TARGET_DIR/$TARGET/release/$out_name" "$out_dir/"
+        cargo build --release --target "$TARGET" "${bin_flags[@]}"
+
+        for b in "${BINARIES[@]}"; do
+          cp "$CARGO_TARGET_DIR/$TARGET/release/${b}.exe" "$out_dir/"
+        done
 
         echo "Build complete:"
         find "$out_dir" -type f
 
-        echo "Uploading $TARGET build..."
-        ginger-infra upload "${executable_name}-binaries/${version}/${TARGET}" "${out_dir}/${out_name}" --overwrite
+        for b in "${BINARIES[@]}"; do
+          echo "Uploading ${b} (${TARGET}) build..."
+          ginger-infra upload "${executable_name}-binaries/${version}/${TARGET}/${b}.exe" "${out_dir}/${b}.exe" --overwrite
+        done

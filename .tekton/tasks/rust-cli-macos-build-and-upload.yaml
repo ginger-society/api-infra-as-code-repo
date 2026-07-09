@@ -14,6 +14,7 @@ spec:
     echo "USER     : $USER"
     echo "GIT_REPO_NAME: $GIT_REPO_NAME"
     echo "IMAGE_TAG: $IMAGE_TAG"
+    echo "BINARIES_TO_BUILD: $BINARIES_TO_BUILD"
 
     cd "$HOME"
     export TMPDIR="$HOME/.tmp"
@@ -70,6 +71,20 @@ spec:
     fi
     echo "Building executable: $executable_name (version $version)"
 
+    # ── which [[bin]] targets to build ──────────────────────────────────
+    # BINARIES_TO_BUILD is a CSV of bin names from Cargo.toml's [[bin]]
+    # entries. If unset/empty, fall back to just the main bin.
+    IFS=',' read -ra BINARIES <<< "${BINARIES_TO_BUILD:-}"
+    if [ ${#BINARIES[@]} -eq 0 ] || [ -z "${BINARIES[0]}" ]; then
+      BINARIES=("$executable_name")
+    fi
+    echo "Binaries to build: ${BINARIES[*]}"
+
+    bin_flags=()
+    for b in "${BINARIES[@]}"; do
+      bin_flags+=(--bin "$b")
+    done
+
     # ── macOS builds native on this runner (arm64 + amd64 cross) ──────────
     # aarch64-unknown-linux-gnu is now built separately in the
     # docker-arm64-linux-build task, to avoid running two concurrent
@@ -82,17 +97,21 @@ spec:
 
     for target in "${macos_targets[@]}"; do
       echo "Building for $target..."
-      cargo build --release --target "$target"
+      cargo build --release --target "$target" "${bin_flags[@]}"
       mkdir -p "./bin/$target"
-      cp "$CARGO_TARGET_DIR/$target/release/$executable_name" "./bin/$target/"
+      for b in "${BINARIES[@]}"; do
+        cp "$CARGO_TARGET_DIR/$target/release/$b" "./bin/$target/"
+      done
     done
 
     echo "Build complete:"
     find bin -type f
 
     for target in "${macos_targets[@]}"; do
-      echo "Uploading $target build..."
-      ginger-infra upload "${executable_name}-binaries/${version}/${target}" "bin/${target}/${executable_name}" --overwrite
+      for b in "${BINARIES[@]}"; do
+        echo "Uploading ${b} (${target}) build..."
+        ginger-infra upload "${executable_name}-binaries/${version}/${target}/${b}" "bin/${target}/${b}" --overwrite
+      done
     done
   cleanup: |
     #!/bin/bash

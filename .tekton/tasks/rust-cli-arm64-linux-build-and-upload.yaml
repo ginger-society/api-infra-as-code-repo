@@ -15,6 +15,7 @@ spec:
     echo "USER     : $USER"
     echo "GIT_REPO_NAME: $GIT_REPO_NAME"
     echo "IMAGE_TAG: $IMAGE_TAG"
+    echo "BINARIES_TO_BUILD: $BINARIES_TO_BUILD"
     cd "$HOME"
     ls -la
     pwd
@@ -78,6 +79,21 @@ spec:
     fi
     echo "Building executable: $executable_name (version $version)"
 
+    # ── which [[bin]] targets to build ──────────────────────────────────
+    # BINARIES_TO_BUILD is a CSV of bin names from Cargo.toml's [[bin]]
+    # entries (e.g. "remote-task-controller,restic-snapshot-controller").
+    # If unset/empty, fall back to just the main bin (default-run/name).
+    IFS=',' read -ra BINARIES <<< "${BINARIES_TO_BUILD:-}"
+    if [ ${#BINARIES[@]} -eq 0 ] || [ -z "${BINARIES[0]}" ]; then
+      BINARIES=("$executable_name")
+    fi
+    echo "Binaries to build: ${BINARIES[*]}"
+
+    bin_flags=""
+    for b in "${BINARIES[@]}"; do
+      bin_flags="${bin_flags} --bin ${b}"
+    done
+
     # ── aarch64-unknown-linux-gnu via docker (native arm64 on this runner) ──
     # Source is bind-mounted (not copied in/out) so the container builds
     # directly against the checked-out repo, and the resulting ./bin and
@@ -101,13 +117,15 @@ spec:
       -e "CARGO_HOME=/cargo-home" \
       -w /workspace \
       gingersociety/rust-cli-builder \
-      bash -c "cargo build --release --target ${target} && mkdir -p ./bin/${target} && cp /cargo-target/${target}/release/${executable_name} ./bin/${target}/"
+      bash -c "cargo build --release --target ${target}${bin_flags} && mkdir -p ./bin/${target} && for b in ${BINARIES[*]}; do cp /cargo-target/${target}/release/\$b ./bin/${target}/; done"
 
     echo "Build complete:"
     find bin -type f
 
-    echo "Uploading aarch64-unknown-linux-gnu build..."
-    ginger-infra upload "${executable_name}-binaries/${version}/aarch64-unknown-linux-gnu" "bin/aarch64-unknown-linux-gnu/${executable_name}" --overwrite
+    for b in "${BINARIES[@]}"; do
+      echo "Uploading ${b} (${target}) build..."
+      ginger-infra upload "${executable_name}-binaries/${version}/${target}/${b}" "bin/${target}/${b}" --overwrite
+    done
   cleanup: |
     #!/bin/bash
     echo "cleanup: nothing to do"
