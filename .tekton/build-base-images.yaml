@@ -95,7 +95,7 @@ spec:
         - name: dockerfile_path
           value: "devcontainer-images/Dockerfile.node.debian"
         - name: build_context
-          value: "."
+          value: "devcontainer-images"
 
     - name: build-push-devcontainer-rust
       runAfter:
@@ -117,7 +117,7 @@ spec:
         - name: dockerfile_path
           value: "devcontainer-images/Dockerfile.rust.bullseye"
         - name: build_context
-          value: "."
+          value: "devcontainer-images"
 
     - name: build-push-devcontainer-iac
       runAfter:
@@ -139,7 +139,7 @@ spec:
         - name: dockerfile_path
           value: "devcontainer-images/Dockerfile.iac.debian"
         - name: build_context
-          value: "."
+          value: "devcontainer-images"
 
     # ─────────────────────────── wrap-up ───────────────────────────
     - name: notify-version-update
