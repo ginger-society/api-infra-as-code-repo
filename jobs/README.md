@@ -2,9 +2,11 @@
 
 
 
-docker build -t gingersociety/tekton-task-ginger:latest --platform=linux/amd64 -f ginger.Dockerfile .
-docker push gingersociety/tekton-task-ginger:latest
+docker build -t gingersociety/tekton-task-ginger-auth:latest --platform=linux/amd64 -f ginger-auth.Dockerfile .
+docker push gingersociety/tekton-task-ginger-auth:latest
 
+docker build -t gingersociety/tekton-task-ginger-connector-and-db:latest --platform=linux/amd64 -f ginger-connector-and-db.Dockerfile .
+docker push gingersociety/tekton-task-ginger-connector-and-db:latest
 
 docker build -t gingersociety/tekton-task-buildah:latest --platform=linux/amd64 -f enhanced-buildah.Dockerfile . --no-cache
 docker push gingersociety/tekton-task-buildah:latest

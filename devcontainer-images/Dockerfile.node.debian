@@ -31,12 +31,6 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra
 RUN npm install -g yarn @openapitools/openapi-generator-cli
 RUN openapi-generator-cli version
 
-# ── AWS CLI ───────────────────────────────────────────────────────────────────
-RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
-    && unzip /tmp/awscliv2.zip -d /tmp \
-    && /tmp/aws/install \
-    && rm -rf /tmp/awscliv2.zip /tmp/aws
-
 # ── Create the dev user (non-root, with sudo) ─────────────────────────────────
 RUN useradd -m -s /bin/zsh dev \
     && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \

@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: ginger-connector-setup
+  namespace: default
+spec:
+  workspaces:
+    - name: general-purpose-cache
+  steps:
+    - name: connect
+      image: gingersociety/tekton-task-ginger-connector-and-db:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        /usr/local/bin/mount-ginger-credentials.sh
+        
+        cd /workspace/source/repo
+
+        echo "Connecting ginger-connector to prod..."
+        ginger-connector connect prod
+
+        echo "ginger-connector prod connection established."
