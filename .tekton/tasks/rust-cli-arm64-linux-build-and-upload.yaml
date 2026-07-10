@@ -30,12 +30,25 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
+    # ── canonicalize the workspace path ─────────────────────────────────────
+    # $HOME was already canonicalized (symlink-resolved) in rpc_creds.sh, but
+    # `cd`/`pwd` without -P can still drift on some shells/mounts, and this is
+    # the exact path string that gets handed to `docker run -v` below. Docker
+    # Desktop's file-sharing layer caches shares per literal path string, so
+    # if this ever doesn't match the resolved form, the container can get a
+    # stale/wrong view of the bind mount — that's what caused the
+    # intermittent "Permission denied" writing Cargo.lock. Always resolve
+    # with pwd -P right before it's used for the mount.
+    WORKSPACE_DIR="$(pwd -P)"
+    echo "Canonical workspace dir: $WORKSPACE_DIR"
+
     # ── persistent build cache, keyed by repo ───────────────────────────────
     # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
     # runs on this runner — bind-mount it into the container so Cargo's
     # target dir survives across jobs instead of rebuilding from scratch.
     export CARGO_TARGET_DIR_HOST="${CACHE_HOME}/${GIT_REPO_NAME}/target-linux-arm64"
     mkdir -p "$CARGO_TARGET_DIR_HOST"
+    CARGO_TARGET_DIR_HOST="$(cd "$CARGO_TARGET_DIR_HOST" && pwd -P)"
     echo "CARGO_TARGET_DIR_HOST: $CARGO_TARGET_DIR_HOST"
 
     # ── persistent cargo registry cache, shared across ALL repos/jobs ──────
@@ -45,6 +58,7 @@ spec:
     # the same dependency versions on every job.
     export CARGO_HOME_HOST="${CACHE_HOME}/cargo-home"
     mkdir -p "$CARGO_HOME_HOST"
+    CARGO_HOME_HOST="$(cd "$CARGO_HOME_HOST" && pwd -P)"
     echo "CARGO_HOME_HOST: $CARGO_HOME_HOST"
 
     ginger-connector connect prod
@@ -128,12 +142,20 @@ spec:
     # world-writable from the start — that's what avoids the permission
     # errors we hit earlier with plain bind mounts on Docker Desktop's Mac
     # virtualization layer.
+    #
+    # All three -v sources below (WORKSPACE_DIR, CARGO_TARGET_DIR_HOST,
+    # CARGO_HOME_HOST) are pre-resolved with `pwd -P`, so they're guaranteed
+    # to be the canonical /private/tmp/... form rather than a mix of /tmp/...
+    # and /private/tmp/.... That consistency is what fixes the intermittent
+    # "Permission denied" on Cargo.lock — Docker Desktop's file-sharing layer
+    # caches mounts per literal path string, and a mismatched string was
+    # causing it to serve a stale/wrong view of the mount.
     target="aarch64-unknown-linux-gnu"
     echo "Building for $target..."
 
     docker run --rm \
       --platform linux/arm64 \
-      -v "$(pwd):/workspace" \
+      -v "${WORKSPACE_DIR}:/workspace" \
       -v "${CARGO_TARGET_DIR_HOST}:/cargo-target" \
       -v "${CARGO_HOME_HOST}:/cargo-home" \
       -e "CARGO_TARGET_DIR=/cargo-target" \
