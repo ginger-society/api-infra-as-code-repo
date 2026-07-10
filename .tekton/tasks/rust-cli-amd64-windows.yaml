@@ -27,8 +27,6 @@ spec:
 
         cd /workspace/source/repo
 
-        ginger-connector connect prod
-
         export CARGO_HOME=/workspace/general-purpose-cache/cargo-windows
         export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target-windows
 
