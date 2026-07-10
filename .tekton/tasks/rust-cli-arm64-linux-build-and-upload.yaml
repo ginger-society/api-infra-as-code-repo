@@ -30,7 +30,7 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
-    chmod -R a+rwX 
+    chmod -R a+rwX .
 
     # ── persistent build cache, keyed by repo ───────────────────────────────
     # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
