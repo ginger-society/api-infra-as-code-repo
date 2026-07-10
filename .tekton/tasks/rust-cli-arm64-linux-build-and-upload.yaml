@@ -31,7 +31,8 @@ spec:
     git log -1 --oneline
 
     ls -la
-    
+    rm -f Cargo.lock
+
     # ── persistent build cache, keyed by repo ───────────────────────────────
     # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
     # runs on this runner — bind-mount it into the container so Cargo's
