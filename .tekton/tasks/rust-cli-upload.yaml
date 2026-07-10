@@ -1,0 +1,87 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: upload-rust-cli-builds
+  namespace: default
+spec:
+  params:
+    - name: binaries_to_upload
+      type: string
+      default: ""
+  steps:
+    - name: upload
+      image: gingersociety/tekton-task-ginger-infra:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Uploading rust CLI builds..."
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        # ── derive name + version dynamically from Cargo.toml ──────────────
+        package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
+
+        version=$(echo "$package_section" | grep '^version' | awk -F '"' '{print $2}')
+        default_run=$(echo "$package_section" | grep '^default-run' | awk -F '"' '{print $2}')
+
+        if [ -n "$default_run" ]; then
+          executable_name="$default_run"
+        else
+          executable_name=$(echo "$package_section" | grep '^name' | awk -F '"' '{print $2}')
+        fi
+
+        if [ -z "$executable_name" ]; then
+          echo "Could not determine executable name from Cargo.toml"
+          exit 1
+        fi
+        if [ -z "$version" ]; then
+          echo "Could not determine version from Cargo.toml"
+          exit 1
+        fi
+        echo "Uploading for: $executable_name (version $version)"
+
+        BINARIES_TO_UPLOAD="$(params.binaries_to_upload)"
+        IFS=',' read -ra UPLOAD_BINARIES <<< "$BINARIES_TO_UPLOAD"
+        if [ ${#UPLOAD_BINARIES[@]} -eq 0 ] || [ -z "${UPLOAD_BINARIES[0]}" ]; then
+          UPLOAD_BINARIES=("$executable_name")
+        fi
+        echo "Binaries to upload: ${UPLOAD_BINARIES[*]}"
+
+        if [ ! -d "./bin" ]; then
+          echo "No ./bin directory found — nothing to upload."
+          exit 1
+        fi
+
+        uploaded_any=false
+
+        for target_dir in ./bin/*/; do
+          [ -d "$target_dir" ] || continue
+          TARGET=$(basename "$target_dir")
+          echo "── Checking $TARGET ──"
+
+          for b in "${UPLOAD_BINARIES[@]}"; do
+            candidate=""
+            if [ -f "${target_dir}${b}" ]; then
+              candidate="${target_dir}${b}"
+            elif [ -f "${target_dir}${b}.exe" ]; then
+              candidate="${target_dir}${b}.exe"
+            fi
+
+            if [ -n "$candidate" ]; then
+              echo "Uploading ${candidate} → ${executable_name}-binaries/${version}/${TARGET}"
+              ginger-infra upload "${executable_name}-binaries/${version}/${TARGET}" "$candidate" --overwrite
+              uploaded_any=true
+            else
+              echo "Skipping ${b} for ${TARGET} (not found)"
+            fi
+          done
+        done
+
+        if [ "$uploaded_any" = false ]; then
+          echo "Warning: no binaries were uploaded. Check binaries_to_upload and build outputs."
+          exit 1
+        fi
+
+        echo "Upload complete."

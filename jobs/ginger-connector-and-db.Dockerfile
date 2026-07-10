@@ -26,5 +26,5 @@ RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra
 RUN bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra-as-code-repo/main/rust-helpers/installer.sh)" -- ginger-society/ginger-db:latest
 
 # Copy setup script
-COPY copy-credentials-to-workspace.sh /usr/local/bin/copy-credentials-to-workspace.sh
-RUN chmod +x /usr/local/bin/copy-credentials-to-workspace.sh
+COPY mount-ginger-credentials.sh /usr/local/bin/mount-ginger-credentials.sh
+RUN chmod +x /usr/local/bin/mount-ginger-credentials.sh

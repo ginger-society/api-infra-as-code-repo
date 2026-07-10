@@ -5,6 +5,9 @@
 docker build -t gingersociety/tekton-task-ginger-auth:latest --platform=linux/amd64 -f ginger-auth.Dockerfile .
 docker push gingersociety/tekton-task-ginger-auth:latest
 
+docker build -t gingersociety/tekton-task-ginger-infra:latest --platform=linux/amd64 -f ginger-infra.Dockerfile .
+docker push gingersociety/tekton-task-ginger-infra:latest
+
 docker build -t gingersociety/tekton-task-ginger-connector-and-db:latest --platform=linux/amd64 -f ginger-connector-and-db.Dockerfile .
 docker push gingersociety/tekton-task-ginger-connector-and-db:latest
 
