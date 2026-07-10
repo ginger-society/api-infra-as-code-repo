@@ -8,7 +8,10 @@ RUN apt update && apt install -y \
     gcc-mingw-w64-x86-64 \
     gcc-aarch64-linux-gnu \
     perl \
-    make
+    make \
+    libgtk-3-dev libglib2.0-dev libcairo2-dev libpango1.0-dev \
+    libatk1.0-dev libgdk-pixbuf2.0-dev \
+    libxdo-dev
 
 
 RUN rustup target add x86_64-pc-windows-gnu
