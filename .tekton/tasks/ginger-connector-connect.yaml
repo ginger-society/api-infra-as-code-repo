@@ -13,7 +13,7 @@ spec:
       script: |
         #!/bin/bash
         set -e
-        /usr/local/bin/copy-credentials-to-workspace.sh
+        /usr/local/bin/mount-ginger-credentials.sh
         
         cd /workspace/source/repo
 
