@@ -30,13 +30,20 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
-    ls -la
-    rm -f Cargo.lock
-
     # ── persistent build cache, keyed by repo ───────────────────────────────
     # $HOME is per-job (wiped each RPC_JOB_ID), but $CACHE_HOME persists across
     # runs on this runner — bind-mount it into the container so Cargo's
     # target dir survives across jobs instead of rebuilding from scratch.
+    #
+    # NOTE: these caches are safe to bind-mount because cargo only ever ADDS
+    # new files here (new crate versions, new target artifacts) — it never
+    # needs to modify a file that already existed on the host side of the
+    # mount before the container attached to it. That's the distinction that
+    # matters: Docker Desktop's macOS file-sharing layer has been observed to
+    # reliably allow a container to create new files through a bind mount,
+    # but to intermittently/consistently refuse writes that modify a
+    # pre-existing host file through that same mount (this is what broke
+    # Cargo.lock updates — see the workspace copy step below for the fix).
     export CARGO_TARGET_DIR_HOST="${CACHE_HOME}/${GIT_REPO_NAME}/target-linux-arm64"
     mkdir -p "$CARGO_TARGET_DIR_HOST"
     echo "CARGO_TARGET_DIR_HOST: $CARGO_TARGET_DIR_HOST"
@@ -121,29 +128,57 @@ spec:
     echo "Binaries to upload: ${UPLOAD_BINARIES[*]}"
 
     # ── aarch64-unknown-linux-gnu via docker (native arm64 on this runner) ──
-    # Source is bind-mounted (not copied in/out) so the container builds
-    # directly against the checked-out repo, and the resulting ./bin and
-    # cargo target dir land straight back on the host — no docker cp needed.
     #
-    # NOTE: the build runs as root inside the container. rpc_creds.sh sets
-    # `umask 0000` for the whole job, so anything newly created under
-    # $HOME/$CACHE_HOME (including these mounted dirs' contents) comes out
-    # world-writable from the start — that's what avoids the permission
-    # errors we hit earlier with plain bind mounts on Docker Desktop's Mac
-    # virtualization layer.
+    # The repo is COPIED into the container's own filesystem (docker cp),
+    # not bind-mounted. This is deliberate: Docker Desktop's macOS
+    # file-sharing layer will happily let a container CREATE new files
+    # through a bind mount, but will refuse/corrupt writes that MODIFY a
+    # file that already existed on the host before the mount was attached —
+    # which is exactly what cargo needs to do to Cargo.lock whenever the
+    # dependency graph changes (e.g. after the codegen step above adds a new
+    # generated local client crate). Copying the repo in means every file
+    # cargo might rewrite was created fresh inside the container's own
+    # storage, so that failure mode can't happen. The two cache dirs below
+    # stay bind-mounted since cargo only ever adds new files to them.
+    #
+    # docker create + docker cp + docker start (rather than docker run) is
+    # what makes the copy-in / copy-out possible: `create` sets up the
+    # container without starting it, `cp` populates /workspace from the
+    # host repo, then `start -a` runs the actual build and streams output.
     target="aarch64-unknown-linux-gnu"
     echo "Building for $target..."
 
-    docker run --rm \
+    CONTAINER_NAME="build-${GIT_REPO_NAME}-${RPC_JOB_ID}"
+
+    cleanup_build_container() {
+      docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    }
+    trap cleanup_build_container EXIT
+
+    echo "Creating build container..."
+    docker create --name "$CONTAINER_NAME" \
       --platform linux/arm64 \
-      -v "$(pwd):/workspace" \
       -v "${CARGO_TARGET_DIR_HOST}:/cargo-target" \
       -v "${CARGO_HOME_HOST}:/cargo-home" \
       -e "CARGO_TARGET_DIR=/cargo-target" \
       -e "CARGO_HOME=/cargo-home" \
       -w /workspace \
       gingersociety/rust-cli-builder \
-      bash -c "cargo build --release --target ${target}${bin_flags} && mkdir -p ./bin/${target} && for b in ${BINARIES[*]}; do cp /cargo-target/${target}/release/\$b ./bin/${target}/; done"
+      bash -c "cargo build --release --target ${target}${bin_flags} && mkdir -p ./bin/${target} && for b in ${BINARIES[*]}; do cp /cargo-target/${target}/release/\$b ./bin/${target}/; done" \
+      > /dev/null
+
+    echo "Copying repo into build container..."
+    docker cp ./. "${CONTAINER_NAME}:/workspace"
+
+    echo "Running build..."
+    if ! docker start -a "$CONTAINER_NAME"; then
+      echo "Build failed inside container"
+      exit 1
+    fi
+
+    echo "Copying build output back..."
+    rm -rf bin
+    docker cp "${CONTAINER_NAME}:/workspace/bin" ./bin
 
     echo "Build complete:"
     find bin -type f
