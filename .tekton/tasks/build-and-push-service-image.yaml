@@ -7,7 +7,12 @@ spec:
   params:
     - name: image_tag
       type: string
-    - name: image_repo
+    - name: registry
+      type: string
+      default: "docker.gingersociety.org"
+    - name: org_id
+      type: string
+    - name: image_name
       type: string
     - name: binary_name
       type: string
@@ -61,7 +66,8 @@ spec:
           exit 1
         fi
 
-        FINAL_IMAGE_LATEST="$(params.image_repo):latest"
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        FINAL_IMAGE_LATEST="${IMAGE_REPO}:latest"
 
         container=$(buildah from \
           --storage-driver=vfs \
