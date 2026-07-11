@@ -18,19 +18,17 @@ spec:
         mkdir -p "$PNPM_HOME"
         pnpm config set store-dir "$PNPM_HOME"
 
-        # ── persist node_modules across builds, keyed by repo ──────────────
-        # Restoring a previously-built node_modules avoids pnpm having to
-        # copy every package out of the store on every run — it only has to
-        # do that once. On subsequent runs pnpm just verifies against the
-        # lockfile and (if unchanged) does almost nothing.
+        # ── keep node_modules on the same PVC as the pnpm store ────────────
+        # Symlinking (instead of copying in/out) means pnpm writes directly
+        # to persistent storage, and — since node_modules and the store are
+        # now on the same filesystem — pnpm can hardlink packages out of the
+        # store instead of copying file contents, which is the slow part.
         REPO_KEY=$(basename "$(git rev-parse --show-toplevel)")
         NM_CACHE="/workspace/general-purpose-cache/node_modules-cache/${REPO_KEY}"
         mkdir -p "$NM_CACHE"
 
-        if [ -d "$NM_CACHE/node_modules" ]; then
-          echo "Restoring cached node_modules..."
-          cp -a "$NM_CACHE/node_modules" ./node_modules
-        fi
+        rm -rf ./node_modules
+        ln -s "$NM_CACHE" ./node_modules
 
         pnpm i
         pnpm build
@@ -39,10 +37,6 @@ spec:
           echo "Build finished but ./dist was not produced — check the pnpm build output above."
           exit 1
         fi
-
-        echo "Saving node_modules cache..."
-        rm -rf "$NM_CACHE/node_modules"
-        cp -a ./node_modules "$NM_CACHE/node_modules"
 
         echo "Build complete:"
         find ./dist -maxdepth 1
