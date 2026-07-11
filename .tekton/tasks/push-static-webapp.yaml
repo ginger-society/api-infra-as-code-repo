@@ -1,0 +1,77 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push-frontend-image
+  namespace: default
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: registry
+      type: string
+      default: "docker.gingersociety.org"
+    - name: org_id
+      type: string
+    - name: image_name
+      type: string
+    - name: dist_dir
+      type: string
+      default: "./dist"
+    - name: nginx_html_dest
+      type: string
+      default: "/usr/share/nginx/html"
+    - name: base_image
+      type: string
+      default: "docker.io/nginx:alpine"
+  steps:
+    - name: build-and-push
+      image: gingersociety/tekton-task-buildah:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export XDG_RUNTIME_DIR=/workspace/buildah-cache/runtime
+        export CONTAINERS_STORAGE=/workspace/buildah-cache/storage
+        export CONTAINERS_STORAGE_CONF=/workspace/buildah-cache/storage.conf
+
+        /usr/local/bin/configure_buildah.sh
+        /usr/local/bin/mount-docker-credentials.sh
+
+        cd /workspace/source/repo
+
+        # ── dist already built by build-frontend ───────────────────────────
+        DIST_SRC="$(params.dist_dir)"
+        if [ ! -d "$DIST_SRC" ]; then
+          echo "Dist directory not found at $DIST_SRC"
+          echo "Make sure build-frontend ran and produced it."
+          exit 1
+        fi
+
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        FINAL_IMAGE_LATEST="${IMAGE_REPO}:latest"
+
+        container=$(buildah from \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$(params.base_image)")
+
+        buildah copy \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$container" "$DIST_SRC" "$(params.nginx_html_dest)"
+
+        buildah commit \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$container" "$FINAL_IMAGE_LATEST"
+
+        buildah push \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          --authfile ~/.docker/config.json \
+          "$FINAL_IMAGE_LATEST"
+
+        echo "Image pushed successfully: $FINAL_IMAGE_LATEST"
+      securityContext:
+        privileged: true

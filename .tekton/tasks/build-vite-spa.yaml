@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-vite-spa
+  namespace: default
+spec:
+  steps:
+    - name: build
+      image: docker.io/gingersociety/vite-react-builder:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        cd /workspace/source/repo
+
+        export PNPM_HOME=/workspace/general-purpose-cache/pnpm
+        mkdir -p "$PNPM_HOME"
+        pnpm config set store-dir "$PNPM_HOME"
+
+        pnpm i
+        pnpm build
+
+        if [ ! -d "./dist" ]; then
+          echo "Build finished but ./dist was not produced — check the pnpm build output above."
+          exit 1
+        fi
+
+        echo "Build complete:"
+        find ./dist -maxdepth 1
