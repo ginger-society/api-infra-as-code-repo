@@ -19,5 +19,6 @@ spec:
 
         echo "Connecting ginger-connector to prod..."
         ginger-connector connect prod
+        ginger-connector refer prod
 
         echo "ginger-connector prod connection established."
