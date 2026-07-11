@@ -1,0 +1,120 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push-image
+  namespace: default
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: image_repo
+      type: string
+    - name: binary_name
+      type: string
+    - name: binary_dest
+      type: string
+      default: ""
+    - name: entrypoint
+      type: string
+    - name: run_as_root
+      type: string
+      default: "false"
+    - name: user_id
+      type: string
+      default: "10001"
+    - name: extra_copy_src
+      type: string
+      default: ""
+    - name: extra_copy_dest
+      type: string
+      default: ""
+    - name: base_image
+      type: string
+      default: "docker.io/gingersociety/k8-controller-and-runner-base:latest"
+  steps:
+    - name: build-and-push
+      image: gingersociety/tekton-task-buildah:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export XDG_RUNTIME_DIR=/workspace/buildah-cache/runtime
+        export CONTAINERS_STORAGE=/workspace/buildah-cache/storage
+        export CONTAINERS_STORAGE_CONF=/workspace/buildah-cache/storage.conf
+
+        /usr/local/bin/configure_buildah.sh
+        /usr/local/bin/mount-docker-credentials.sh
+
+        cd /workspace/source/repo
+
+        # ── binary already built by build-amd64-linux ─────────────────────
+        BINARY_SRC="./bin/x86_64-unknown-linux-gnu/$(params.binary_name)"
+        BINARY_DEST="$(params.binary_dest)"
+        if [ -z "$BINARY_DEST" ]; then
+          BINARY_DEST="/usr/local/bin/$(params.binary_name)"
+        fi
+
+        if [ ! -f "$BINARY_SRC" ]; then
+          echo "Binary not found at $BINARY_SRC"
+          echo "Make sure '$(params.binary_name)' is listed in build-amd64-linux's binaries_to_build param."
+          exit 1
+        fi
+
+        FINAL_IMAGE_LATEST="$(params.image_repo):latest"
+
+        container=$(buildah from \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$(params.base_image)")
+
+        buildah copy \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$container" "$BINARY_SRC" "$BINARY_DEST"
+
+        buildah run \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$container" -- chmod +x "$BINARY_DEST"
+
+        if [ -n "$(params.extra_copy_src)" ]; then
+          buildah copy \
+            --storage-driver=vfs \
+            --root=$CONTAINERS_STORAGE \
+            "$container" "$(params.extra_copy_src)" "$(params.extra_copy_dest)"
+
+          buildah run \
+            --storage-driver=vfs \
+            --root=$CONTAINERS_STORAGE \
+            "$container" -- chmod +x "$(params.extra_copy_dest)"
+        fi
+
+        if [ "$(params.run_as_root)" != "true" ]; then
+          buildah config \
+            --storage-driver=vfs \
+            --root=$CONTAINERS_STORAGE \
+            --user "$(params.user_id)" \
+            "$container"
+        fi
+
+        buildah config \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          --entrypoint "$(params.entrypoint)" \
+          "$container"
+
+        buildah commit \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          "$container" "$FINAL_IMAGE_LATEST"
+
+        buildah push \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          --authfile ~/.docker/config.json \
+          "$FINAL_IMAGE_LATEST"
+
+        echo "Image pushed successfully: $FINAL_IMAGE_LATEST"
+      securityContext:
+        privileged: true
