@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: build-amd64-linux
+  name: build-rust-amd64-linux
   namespace: default
 spec:
   params:
