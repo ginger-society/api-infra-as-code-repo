@@ -4,6 +4,13 @@ metadata:
   name: ginger-connector-setup
   namespace: default
 spec:
+  params:
+    - name: run_refer
+      type: string
+      default: "false"
+    - name: connector_env
+      type: string
+      default: "prod"
   workspaces:
     - name: general-purpose-cache
   steps:
@@ -14,11 +21,17 @@ spec:
         #!/bin/bash
         set -e
         /usr/local/bin/mount-ginger-credentials.sh
-        
+
         cd /workspace/source/repo
 
-        echo "Connecting ginger-connector to prod..."
-        ginger-connector connect prod
-        ginger-connector refer prod
+        echo "Connecting ginger-connector to $(params.connector_env)..."
+        ginger-connector connect "$(params.connector_env)"
 
-        echo "ginger-connector prod connection established."
+        if [ "$(params.run_refer)" = "true" ]; then
+          echo "Referring ginger-connector to $(params.connector_env)..."
+          ginger-connector refer "$(params.connector_env)"
+        else
+          echo "Skipping ginger-connector refer (run_refer=false)"
+        fi
+
+        echo "ginger-connector $(params.connector_env) connection established."
