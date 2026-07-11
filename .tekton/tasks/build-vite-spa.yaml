@@ -18,15 +18,6 @@ spec:
         mkdir -p "$PNPM_HOME"
         pnpm config set store-dir "$PNPM_HOME"
 
-        NM_CACHE="/workspace/general-purpose-cache/node_modules-cache"
-        mkdir -p "$NM_CACHE"
-
-        rm -rf ./node_modules
-        ln -s "$NM_CACHE" ./node_modules
-
-        echo "node_modules -> $(readlink -f ./node_modules)"
-        echo "Cache currently has $(find "$NM_CACHE" -maxdepth 1 -mindepth 1 | wc -l) top-level entries before install"
-
         pnpm i
         pnpm build
 
