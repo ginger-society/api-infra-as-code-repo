@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: build-rust-amd64-linux
+  name: build-amd64-linux
   namespace: default
 spec:
   params:
@@ -10,7 +10,7 @@ spec:
       default: ""
   steps:
     - name: build
-      image: gingersociety/multi-arch-rust:latest
+      image: docker.gingersociety.org/ginger-society/multi-arch-rust
       imagePullPolicy: Always
       script: |
         #!/bin/bash
