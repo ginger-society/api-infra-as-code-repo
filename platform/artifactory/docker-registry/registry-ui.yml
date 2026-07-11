@@ -32,7 +32,7 @@ spec:
         # check + IAM redirect + handle-auth callback) internally, so the
         # ginger-auth-proxy sidecar is no longer needed for this service. ──
         - name: registry-ui
-          image: gingersociety/container-registry-ui:latest
+          image: docker.gingersociety.org/ginger-society/container-registry-ui:latest
           imagePullPolicy: Always
           env:
             - name: REDIS_URI
