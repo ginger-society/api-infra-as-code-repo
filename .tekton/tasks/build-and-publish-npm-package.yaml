@@ -31,9 +31,6 @@ spec:
 
         cd /workspace/source/repo
 
-        echo "=== DEBUG: is icons/ on disk after checkout? ==="
-        ls -la src/icons/ 2>&1 || echo "MISSING ON DISK"
-
         export PNPM_HOME=/workspace/general-purpose-cache/pnpm
         mkdir -p "$PNPM_HOME"
         pnpm config set store-dir "$PNPM_HOME"
