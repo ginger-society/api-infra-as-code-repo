@@ -29,21 +29,19 @@ spec:
       script: |
         #!/bin/bash
         set -e
-        echo "Building for amd64 linux..."
+        TARGET="$(params.target)"
+        echo "Building for $TARGET..."
         export PATH="/root/.cargo/bin:$PATH"
-
-        mkdir -p /workspace/general-purpose-cache/target
-        mkdir -p /workspace/general-purpose-cache/cargo
 
         cd /workspace/source/repo
 
-        export CARGO_HOME=/workspace/general-purpose-cache/cargo-linux
-        export CARGO_TARGET_DIR=/workspace/general-purpose-cache/target-linux
+        # Shared across targets — cargo's package-cache lock makes this safe
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo
 
-        mkdir -p /workspace/general-purpose-cache/target-linux
-        mkdir -p /workspace/general-purpose-cache/cargo-linux
+        # Must be per-target so parallel gnu/musl/arm64 builds don't collide
+        export CARGO_TARGET_DIR="/workspace/general-purpose-cache/target-${TARGET}"
 
-        TARGET="$(params.target)"
+        mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
 
         # ── derive name + version dynamically from Cargo.toml ──────────────
         package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
@@ -88,7 +86,6 @@ spec:
         fi
         mkdir -p "$out_dir"
 
-        echo "Building for $TARGET..."
         cargo build --release --target "$TARGET" "${bin_flags[@]}"
 
         for b in "${BINARIES[@]}"; do
