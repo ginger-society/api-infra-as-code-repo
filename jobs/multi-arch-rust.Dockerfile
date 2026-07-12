@@ -11,8 +11,11 @@ RUN apt update && apt install -y \
     make \
     libgtk-3-dev libglib2.0-dev libcairo2-dev libpango1.0-dev \
     libatk1.0-dev libgdk-pixbuf2.0-dev \
-    libxdo-dev libpq-dev
+    libxdo-dev libpq-dev \
+    musl-tools musl-dev
 
+RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
+    ln -s /usr/include/generic /usr/include/x86_64-linux-musl/generic
 
 RUN rustup target add x86_64-pc-windows-gnu
 RUN rustup target add aarch64-unknown-linux-gnu

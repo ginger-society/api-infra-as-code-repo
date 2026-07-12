@@ -8,10 +8,24 @@ spec:
     - name: binaries_to_build
       type: string
       default: ""
+    - name: openssl_static
+      type: string
+      default: ""
+    - name: openssl_dir
+      type: string
+      default: ""
+    - name: target
+      type: string
+      default: "x86_64-unknown-linux-gnu"
   steps:
     - name: build
       image: docker.gingersociety.org/ginger-society/multi-arch-rust
       imagePullPolicy: Always
+      env:
+        - name: OPENSSL_STATIC
+          value: "$(params.openssl_static)"
+        - name: OPENSSL_DIR
+          value: "$(params.openssl_dir)"
       script: |
         #!/bin/bash
         set -e
@@ -29,7 +43,7 @@ spec:
         mkdir -p /workspace/general-purpose-cache/target-linux
         mkdir -p /workspace/general-purpose-cache/cargo-linux
 
-        TARGET="x86_64-unknown-linux-gnu"
+        TARGET="$(params.target)"
 
         # ── derive name + version dynamically from Cargo.toml ──────────────
         package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)

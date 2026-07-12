@@ -18,15 +18,7 @@ docker build -t gingersociety/tekton-task-gitter:latest --platform=linux/amd64 -
 docker push gingersociety/tekton-task-gitter:latest
 
 
-docker build -t gingersociety/enhanced-rust-builder:latest --platform=linux/amd64 -f enhanced-rust-builder.Dockerfile .
-docker push gingersociety/enhanced-rust-builder:latest
-
-
-docker build -t gingersociety/enhanced-node-builder:latest --platform=linux/amd64 -f enhanced-node-builder.Dockerfile .
-docker push gingersociety/enhanced-node-builder:latest
-
-
-docker build --progress=plain -t gingersociety/multi-arch-rust-cli-builder:latest --platform=linux/amd64 -f multi-arch-rust-cli.Dockerfile .
+docker build --progress=plain -t gingersociety/multi-arch-rust-cli-builder:latest --platform=linux/amd64 -f multi-arch-rust.Dockerfile .
 docker push gingersociety/multi-arch-rust-cli-builder:latest
 
 

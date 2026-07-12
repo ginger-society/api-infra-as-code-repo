@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push-image-from-dockerfile
+  namespace: default
+spec:
+  params:
+    - name: registry
+      type: string
+      default: "docker.gingersociety.org"
+    - name: org_id
+      type: string
+    - name: image_name
+      type: string
+    - name: dockerfile_path
+      type: string
+      default: "./Dockerfile"
+    - name: build_context
+      type: string
+      default: "."
+  steps:
+    - name: build-and-push
+      image: gingersociety/tekton-task-buildah:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export XDG_RUNTIME_DIR=/workspace/buildah-cache/runtime
+        export CONTAINERS_STORAGE=/workspace/buildah-cache/storage
+        export CONTAINERS_STORAGE_CONF=/workspace/buildah-cache/storage.conf
+
+        /usr/local/bin/configure_buildah.sh
+        /usr/local/bin/mount-docker-credentials.sh
+
+        cd /workspace/source/repo
+
+        DOCKERFILE_PATH="$(params.dockerfile_path)"
+        if [ ! -f "$DOCKERFILE_PATH" ]; then
+          echo "Dockerfile not found at $DOCKERFILE_PATH"
+          exit 1
+        fi
+
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        FINAL_IMAGE_LATEST="${IMAGE_REPO}:latest"
+
+        echo "Building $FINAL_IMAGE_LATEST from $DOCKERFILE_PATH (context: $(params.build_context)) ..."
+        buildah bud \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          -f "$DOCKERFILE_PATH" \
+          -t "$FINAL_IMAGE_LATEST" \
+          "$(params.build_context)"
+
+        buildah push \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          --authfile ~/.docker/config.json \
+          "$FINAL_IMAGE_LATEST"
+
+        echo "Image pushed successfully: $FINAL_IMAGE_LATEST"
+      securityContext:
+        privileged: true
