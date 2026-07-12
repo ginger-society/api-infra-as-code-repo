@@ -19,7 +19,7 @@ spec:
       default: "x86_64-unknown-linux-gnu"
   steps:
     - name: build
-      image: docker.gingersociety.org/ginger-society/multi-arch-rust
+      image: docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64
       imagePullPolicy: Always
       env:
         - name: OPENSSL_STATIC
