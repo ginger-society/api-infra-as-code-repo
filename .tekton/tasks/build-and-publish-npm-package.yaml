@@ -31,14 +31,6 @@ spec:
 
         cd /workspace/source/repo
 
-        cd /workspace/source/repo
-
-        echo "=== DEBUG: HEAD commit (no git binary needed) ==="
-        cat .git/HEAD 2>&1
-        # if it prints "ref: refs/heads/main", follow it:
-        cat .git/refs/heads/main 2>&1 || echo "no local ref file — might be packed-refs"
-        grep 'refs/heads/main' .git/packed-refs 2>&1
-
         echo "=== DEBUG: is icons/ on disk after checkout? ==="
         ls -la src/icons/ 2>&1 || echo "MISSING ON DISK"
 
