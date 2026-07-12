@@ -29,6 +29,14 @@ spec:
       script: |
         #!/bin/bash
         set -e
+
+        if [ -n "$(params.openssl_dir)" ]; then
+          export OPENSSL_DIR="$(params.openssl_dir)"
+        fi
+        if [ -n "$(params.openssl_static)" ]; then
+          export OPENSSL_STATIC="$(params.openssl_static)"
+        fi
+
         TARGET="$(params.target)"
         echo "Building for $TARGET..."
         export PATH="/root/.cargo/bin:$PATH"
