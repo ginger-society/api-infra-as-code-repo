@@ -5,18 +5,9 @@ metadata:
   namespace: default
 spec:
   params:
-    - name: package_dir
-      type: string
-      default: "."
     - name: build_command
       type: string
       default: "pnpm build"
-    - name: publish_tag
-      type: string
-      default: "latest"
-    - name: publish_access
-      type: string
-      default: "public"
   steps:
     - name: build-and-publish
       image: docker.io/gingersociety/vite-react-builder:latest
@@ -42,9 +33,6 @@ spec:
 
         cd /workspace/source/repo
 
-        PACKAGE_DIR="$(params.package_dir)"
-        cd "$PACKAGE_DIR" 2>/dev/null || { echo "package_dir '$PACKAGE_DIR' not found under repo root"; exit 1; }
-
         echo "Installing dependencies..."
         pnpm i
 
@@ -52,7 +40,4 @@ spec:
         $(params.build_command)
 
         echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")..."
-        pnpm publish \
-          --tag "$(params.publish_tag)" \
-          --access "$(params.publish_access)" \
-          --no-git-checks
+        pnpm publish
