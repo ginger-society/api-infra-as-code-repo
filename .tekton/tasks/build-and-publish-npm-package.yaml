@@ -40,4 +40,4 @@ spec:
         $(params.build_command)
 
         echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")..."
-        pnpm publish
+        pnpm publish --no-git-checks
