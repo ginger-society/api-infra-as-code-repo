@@ -31,6 +31,13 @@ spec:
 
         cd /workspace/source/repo
 
+        echo "=== DEBUG: checked-out commit ==="
+        git log -1 --oneline
+        git rev-parse HEAD
+
+        echo "=== DEBUG: does src/icons exist? ==="
+        ls -la src/icons/ || echo "src/icons/ MISSING in this checkout"
+
         export PNPM_HOME=/workspace/general-purpose-cache/pnpm
         mkdir -p "$PNPM_HOME"
         pnpm config set store-dir "$PNPM_HOME"
