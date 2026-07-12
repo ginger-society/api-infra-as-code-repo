@@ -18,6 +18,8 @@ spec:
 
         export HUSKY=0
 
+        export CI=true
+
         # ── restore npm credentials staged by ginger-connector-setup ───────
         # That step runs `ginger-auth token-login` in its own container and
         # copies the resulting ~/.npmrc into the shared /workspace/creds
@@ -36,10 +38,10 @@ spec:
         pnpm config set store-dir "$PNPM_HOME"
 
         echo "Installing dependencies..."
-        pnpm i
+        pnpm i --reporter=append-only
 
         echo "Building..."
         $(params.build_command)
 
         echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")..."
-        pnpm publish --no-git-checks
+        pnpm publish --no-git-checks --reporter=append-only
