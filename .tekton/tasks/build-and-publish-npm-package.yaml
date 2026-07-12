@@ -16,22 +16,24 @@ spec:
         #!/bin/bash
         set -e
 
+        export HUSKY=0
+
         # ── restore npm credentials staged by ginger-connector-setup ───────
         # That step runs `ginger-auth token-login` in its own container and
         # copies the resulting ~/.npmrc into the shared /workspace/creds
         # workspace, since this step's $HOME starts empty.
         if [ ! -f /workspace/creds/.npmrc ]; then
-          echo "No .npmrc found in /workspace/creds — did ginger-connector-setup run first?"
+          echo "No .npmrc found in /workspace/creds — did ginger-auth run first?"
           exit 1
         fi
         cp /workspace/creds/.npmrc "$HOME/.npmrc"
         chmod 600 "$HOME/.npmrc"
 
+        cd /workspace/source/repo
+
         export PNPM_HOME=/workspace/general-purpose-cache/pnpm
         mkdir -p "$PNPM_HOME"
         pnpm config set store-dir "$PNPM_HOME"
-
-        cd /workspace/source/repo
 
         echo "Installing dependencies..."
         pnpm i
