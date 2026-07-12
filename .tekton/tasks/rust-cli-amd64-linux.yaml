@@ -21,11 +21,6 @@ spec:
     - name: build
       image: docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64
       imagePullPolicy: Always
-      env:
-        - name: OPENSSL_STATIC
-          value: "$(params.openssl_static)"
-        - name: OPENSSL_DIR
-          value: "$(params.openssl_dir)"
       script: |
         #!/bin/bash
         set -e
