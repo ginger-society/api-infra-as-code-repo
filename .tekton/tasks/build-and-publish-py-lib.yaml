@@ -1,0 +1,32 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-publish-py-lib
+  namespace: default
+spec:
+  steps:
+    - name: build-and-publish
+      image: gingersociety/py-lib-base:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        cd /workspace/source/repo
+
+        # ── wire up pypi credentials ─────────────────────────────────
+        cp "$(workspaces.creds.path)/.pypirc" "$HOME/.pypirc"
+        chmod 600 "$HOME/.pypirc"
+
+        # ── build sdist + wheel ──────────────────────────────────────
+        echo "Building sdist and wheel..."
+        python setup.py sdist bdist_wheel
+
+        echo "Build artifacts:"
+        find dist -type f
+
+        # ── upload via twine ─────────────────────────────────────────
+        echo "Uploading to PyPI..."
+        python -m twine upload dist/*
+
+        echo "Publish complete."
