@@ -27,6 +27,6 @@ spec:
 
         # ── upload via twine ─────────────────────────────────────────
         echo "Uploading to PyPI..."
-        python -m twine upload dist/*
+        python -m twine upload -r ginger-society dist/*
 
         echo "Publish complete."
