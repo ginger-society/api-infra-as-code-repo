@@ -1,0 +1,68 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-test-amd64-linux-rust-lib
+  namespace: default
+spec:
+  params:
+    - name: openssl_static
+      type: string
+      default: ""
+    - name: openssl_dir
+      type: string
+      default: ""
+    - name: target
+      type: string
+      default: "x86_64-unknown-linux-gnu"
+  steps:
+    - name: build-and-test
+      image: docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        if [ -n "$(params.openssl_dir)" ]; then
+          export OPENSSL_DIR="$(params.openssl_dir)"
+        fi
+        if [ -n "$(params.openssl_static)" ]; then
+          export OPENSSL_STATIC="$(params.openssl_static)"
+        fi
+
+        TARGET="$(params.target)"
+        echo "Building and testing for $TARGET..."
+        export PATH="/root/.cargo/bin:$PATH"
+
+        cd /workspace/source/repo
+
+        # Shared across targets — cargo's package-cache lock makes this safe
+        export CARGO_HOME=/workspace/general-purpose-cache/cargo
+
+        # Must be per-target so parallel gnu/musl/arm64 builds don't collide
+        export CARGO_TARGET_DIR="/workspace/general-purpose-cache/target-${TARGET}"
+
+        mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+        # ── derive name + version dynamically from Cargo.toml (for logging only) ──
+        package_section=$(awk '/^\[package\]/{f=1;next} /^\[/{f=0} f' Cargo.toml)
+
+        crate_name=$(echo "$package_section" | grep '^name' | awk -F '"' '{print $2}')
+        version=$(echo "$package_section" | grep '^version' | awk -F '"' '{print $2}')
+
+        if [ -z "$crate_name" ]; then
+          echo "Could not determine crate name from Cargo.toml"
+          exit 1
+        fi
+        if [ -z "$version" ]; then
+          echo "Could not determine version from Cargo.toml"
+          exit 1
+        fi
+        echo "Building and testing lib crate: $crate_name (version $version)"
+
+        echo "Running cargo build..."
+        cargo build --release --target "$TARGET" --lib
+
+        echo "Running cargo test..."
+        cargo test --release --target "$TARGET" --lib
+
+        echo "Build and test complete for $crate_name"

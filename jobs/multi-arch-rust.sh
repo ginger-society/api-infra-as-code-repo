@@ -1,9 +1,9 @@
 # Run this on M series macbooks
 
-docker build -t docker.gingersociety.org/ginger-society/multi-arch-rust:latest-arm64 --platform=linux/arm64 . -f multi-arch-rust.Dockerfile --no-cache
+docker build --progress=plain -t docker.gingersociety.org/ginger-society/multi-arch-rust:latest-arm64 --platform=linux/arm64 . -f multi-arch-rust.Dockerfile
 docker push docker.gingersociety.org/ginger-society/multi-arch-rust:latest-arm64
 
-docker build -t docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64 --platform=linux/amd64 . -f multi-arch-rust.Dockerfile --no-cache
+docker build --progress=plain -t docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64 --platform=linux/amd64 . -f multi-arch-rust.Dockerfile
 docker push docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64
 
 

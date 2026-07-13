@@ -1,5 +1,7 @@
-# Dockerfile.build
+# multi-arch-rust.Dockerfile
 FROM rust:1-slim-bullseye
+
+ARG TARGETARCH
 
 RUN apt update && apt install -y \
     pkg-config \
@@ -14,8 +16,30 @@ RUN apt update && apt install -y \
     libxdo-dev libpq-dev \
     musl-tools musl-dev
 
-RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
-    ln -s /usr/include/generic /usr/include/x86_64-linux-musl/generic
+# ── musl include symlink workaround (arch-aware) ─────────────────────────
+# musl-dev doesn't ship the linux kernel headers (asm, asm-generic) that
+# some crates (e.g. ring) expect. We borrow them from the matching
+# glibc multiarch include dir for whichever arch we're building on.
+RUN set -eux; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      mkdir -p /usr/include/x86_64-linux-musl && \
+      ln -sf /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
+      ln -sf /usr/include/generic /usr/include/x86_64-linux-musl/generic ; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      mkdir -p /usr/include/aarch64-linux-musl && \
+      ln -sf /usr/include/aarch64-linux-gnu/asm /usr/include/aarch64-linux-musl/asm && \
+      ln -sf /usr/include/generic /usr/include/aarch64-linux-musl/generic ; \
+    else \
+      echo "Unknown TARGETARCH: $TARGETARCH" && exit 1 ; \
+    fi
+
+# ── musl-gcc wrapper symlink so cc-rs finds the triple-prefixed name ────
+RUN set -eux; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      ln -sf /usr/bin/musl-gcc /usr/bin/x86_64-linux-musl-gcc ; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      ln -sf /usr/bin/musl-gcc /usr/bin/aarch64-linux-musl-gcc ; \
+    fi
 
 RUN rustup target add x86_64-pc-windows-gnu
 RUN rustup target add aarch64-unknown-linux-gnu
@@ -25,7 +49,15 @@ RUN rustup target add x86_64-apple-darwin
 RUN rustup target add aarch64-unknown-linux-musl
 RUN rustup target add x86_64-unknown-linux-musl
 
-# Configure cargo to use the correct linker for aarch64
+# ── cargo linker config for cross targets ───────────────────────────────
 RUN mkdir -p /root/.cargo && \
-    echo '[target.aarch64-unknown-linux-gnu]' >> /root/.cargo/config.toml && \
-    echo 'linker = "aarch64-linux-gnu-gcc"' >> /root/.cargo/config.toml
+    cat >> /root/.cargo/config.toml <<'EOF'
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+[target.x86_64-unknown-linux-musl]
+linker = "musl-gcc"
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-musl-gcc"
+EOF

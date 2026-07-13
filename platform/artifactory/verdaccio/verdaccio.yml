@@ -49,7 +49,7 @@ spec:
                   key: url
             - name: PACKAGES_DIR
               value: "/verdaccio/storage"
-            - name: VERDACCIO_PUBLIC_URL
+            - name: PUBLIC_BASE_URL
               value: "https://npm.gingersociety.org"
             - name: JWT_SECRET
               valueFrom:

@@ -24,3 +24,21 @@ registry garbage-collect --delete-untagged /etc/docker/registry/config.yml
 
 # scale back 
 kubectl scale deployment registry --replicas=1
+
+
+
+find /var/lib/registry/docker/registry/v2/repositories -type d -name _manifests | while read m; do
+  repo_dir=$(dirname "$m")
+  if [ ! -d "$m/tags" ] || [ -z "$(ls -A "$m/tags" 2>/dev/null)" ]; then
+    echo "EMPTY: $repo_dir"
+  fi
+done
+
+
+find /var/lib/registry/docker/registry/v2/repositories -type d -name _manifests | while read m; do
+  repo_dir=$(dirname "$m")
+  if [ ! -d "$m/tags" ] || [ -z "$(ls -A "$m/tags" 2>/dev/null)" ]; then
+    echo "Deleting empty repo: $repo_dir"
+    rm -rf "$repo_dir"
+  fi
+done

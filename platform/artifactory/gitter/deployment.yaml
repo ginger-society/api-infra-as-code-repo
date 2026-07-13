@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: gitolite
-          image: gingersociety/gitter:latest
+          image: docker.gingersociety.org/ginger-society/gitter:latest
           ports:
             - containerPort: 22
           volumeMounts:
@@ -33,7 +33,7 @@ spec:
               mountPath: /etc/ssh/auth_principals
 
         - name: ginger-gitter-service
-          image: gingersociety/ginger-gitter-service:latest
+          image: docker.gingersociety.org/ginger-society/gitter-service:latest
           ports:
             - containerPort: 8080
           imagePullPolicy: Always
