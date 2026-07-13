@@ -37,7 +37,7 @@ spec:
     spec:
       containers:
         - name: verdaccio
-          image: gingersociety/node-registry:latest
+          image: docker.gingersociety.org/ginger-society/node-registry:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

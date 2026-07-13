@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: external-executor
-          image: gingersociety/ginger-external-executor-service:latest
+          image: docker.gingersociety.org/ginger-society/external-executor:latest
           ports:
             - containerPort: 8080
 

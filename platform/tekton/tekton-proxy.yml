@@ -22,7 +22,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: ginger-auth-proxy
-          image: gingersociety/ginger-auth-proxy:latest
+          image: docker.gingersociety.org/ginger-society/auth-proxy:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

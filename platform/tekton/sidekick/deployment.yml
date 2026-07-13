@@ -69,7 +69,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-sidekick-service
-          image: gingersociety/tekton-sidekick-api-stage:latest
+          image: docker.gingersociety.org/ginger-society/tekton-sidekick:latest
           ports:
             - containerPort: 8080
           # Container-level requirements the restricted profile checks

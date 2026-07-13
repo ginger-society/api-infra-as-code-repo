@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: schema-gen-service
-          image: gingersociety/db-compose-runtime-prod:latest
+          image: docker.gingersociety.org/ginger-society/schema-gen-service:latest
           command: ["/app/run.sh"]
           imagePullPolicy: Always
           ports:

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: notificationservice
-          image: gingersociety/notification-service-stage:latest
+          image: docker.gingersociety.org/ginger-society/notification-service:latest
           ports:
             - containerPort: 3030
 

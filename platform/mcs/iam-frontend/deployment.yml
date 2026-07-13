@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: iam-frontend-users
-        image: gingersociety/iam-prod-fe  # Use Apache2 image
+        image: docker.gingersociety.org/ginger-society/iam-fe:latest  # Use Apache2 image
         ports:
         - containerPort: 80  # Apache defaults to port 80
 

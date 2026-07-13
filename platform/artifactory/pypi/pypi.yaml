@@ -42,12 +42,16 @@ spec:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
           effect: "NoSchedule"
+      initContainers:
+        - name: init-tmp-dir
+          image: busybox:1.36
+          command: ["sh", "-c", "mkdir -p /data/packages/.tmp"]
+          volumeMounts:
+            - mountPath: /data/packages
+              name: pypi-storage
       containers:
-        # ── pip-index: now handles its own auth internally (BasicAuth for
-        # protocol routes, session-cookie + IAM redirect for /details), so
-        # the ginger-auth-proxy sidecar is no longer needed. ──────────────
         - name: pip-index
-          image: gingersociety/pip-index:latest
+          image: docker.gingersociety.org/ginger-society/pip-registry:latest
           imagePullPolicy: Always
           env:
             - name: REDIS_URI
@@ -57,6 +61,8 @@ spec:
                   key: url
             - name: PACKAGES_DIR
               value: "/data/packages"
+            - name: ROCKET_TEMP_DIR
+              value: "/data/packages/.tmp"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -68,7 +74,6 @@ spec:
               value: "https://pip.{{HOSTING_FQDN}}/"
             - name: RUST_LOG
               value: "debug"
-
             - name: RABBITMQ_URI
               valueFrom:
                 secretKeyRef:
@@ -90,7 +95,6 @@ spec:
                   key: ROCKET_SECRET_KEY
             - name: ROCKET_ADDRESS
               value: "0.0.0.0"
-
             - name: ROCKET_PORT
               value: "8080"
           ports:

@@ -30,7 +30,7 @@ spec:
 
       containers:
         - name: metadataservice
-          image: gingersociety/metadata-service-api-stage:latest
+          image: docker.gingersociety.org/ginger-society/metadata-service:latest
           ports:
             - containerPort: 8000
 

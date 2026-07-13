@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: iam-admin-fe
-        image: gingersociety/iam-admin-prod-fe  # Use Apache2 image
+        image: docker.gingersociety.org/ginger-society/iam-admin-fe:latest  # Use Apache2 image
         ports:
         - containerPort: 80  # Apache defaults to port 80

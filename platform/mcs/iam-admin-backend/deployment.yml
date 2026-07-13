@@ -28,7 +28,7 @@ spec:
 
       containers:
         - name: iamadminservice
-          image: gingersociety/iam-admin-service-api-stage:latest
+          image: docker.gingersociety.org/ginger-society/iam-admin-service:latest
           ports:
             - containerPort: 8000
 

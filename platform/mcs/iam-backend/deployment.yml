@@ -27,7 +27,7 @@ spec:
 
       containers:
         - name: iamservice
-          image: gingersociety/iam-service-api-stage:latest
+          image: docker.gingersociety.org/ginger-society/iam-service:latest
           ports:
             - containerPort: 8000
 

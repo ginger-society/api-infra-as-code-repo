@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: homepage
-        image: gingersociety/homepage  # Use Apache2 image for in memory caching to reduce disk io
+        image: docker.gingersociety.org/ginger-society/website:latest  # Use Apache2 image for in memory caching to reduce disk io
         ports:
         - containerPort: 80  # Apache defaults to port 80

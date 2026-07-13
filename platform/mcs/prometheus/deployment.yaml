@@ -51,7 +51,7 @@ spec:
         # Listens on :3000, validates JWTs, and forwards authed traffic
         # to Prometheus on localhost:9090.
         - name: ginger-auth-proxy
-          image: gingersociety/ginger-auth-proxy:latest
+          image: docker.gingersociety.org/ginger-society/auth-proxy:latest
           ports:
             - containerPort: 3000
           env:
