@@ -56,7 +56,7 @@ spec:
     FULL_IMAGE_NAME="${REGISTRY}/${ORG_ID}/${IMAGE_NAME}"
 
     TAG="${IMAGE_TAG:-latest}"
-    BUILD_CONTEXT="${BUILD_CONTEXT:-.}"
+    BUILD_CONTEXT="${build_context:-.}"
 
     echo "Building and pushing ${FULL_IMAGE_NAME}:${TAG} (arm64 + amd64) from ${DOCKERFILE_PATH}, context=${BUILD_CONTEXT}..."
 
