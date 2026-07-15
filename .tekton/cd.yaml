@@ -142,6 +142,9 @@ spec:
 
               /usr/local/bin/mount-ginger-credentials.sh
 
+              ls -la
+              cat vault.json
+
               unset KUBERNETES_SERVICE_HOST
               unset KUBERNETES_SERVICE_PORT
               unset KUBERNETES_PORT
