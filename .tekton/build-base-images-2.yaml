@@ -37,8 +37,6 @@ spec:
               value: "multi-arch-rust"
             - name: build_context
               value: "jobs"
-            - name: ctx
-              value: "jobs"
 
     - name: notify-version-update
       runAfter:

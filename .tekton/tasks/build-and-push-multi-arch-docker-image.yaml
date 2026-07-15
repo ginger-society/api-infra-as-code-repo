@@ -18,7 +18,6 @@ spec:
     echo "ORG_ID: $ORG_ID"
     echo "IMAGE_NAME: $IMAGE_NAME"
     echo "BUILD_CONTEXT: $build_context"
-    echo "ctx: $ctx" 
 
     cd "$HOME"
     export TMPDIR="$HOME/.tmp"
@@ -57,7 +56,7 @@ spec:
     FULL_IMAGE_NAME="${REGISTRY}/${ORG_ID}/${IMAGE_NAME}"
 
     TAG="${IMAGE_TAG:-latest}"
-    BUILD_CONTEXT="${BUILD_CONTEXT:-.}"
+    BUILD_CONTEXT="${build_context:-.}"
 
     echo "Building and pushing ${FULL_IMAGE_NAME}:${TAG} (arm64 + amd64) from ${DOCKERFILE_PATH}, context=${BUILD_CONTEXT}..."
 
