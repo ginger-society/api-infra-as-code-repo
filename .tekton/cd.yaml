@@ -143,14 +143,14 @@ spec:
               /usr/local/bin/mount-ginger-credentials.sh
 
               ls -la
-              cat vault.json
 
               unset KUBERNETES_SERVICE_HOST
               unset KUBERNETES_SERVICE_PORT
               unset KUBERNETES_PORT
 
               # ginger-infra install-helm-charts
-              ginger-infra rollout
+              # ginger-infra rollout
+              kubectl get pods --kubeconfig="~/Downloads/kubeconfig/artifactory.yml"
 
           - name: echo
             image: alpine
