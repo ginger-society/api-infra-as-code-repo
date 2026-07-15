@@ -15,7 +15,7 @@ spec:
       default: gingersociety.org
   tasks:
 
-    - name: notify-version-update
+    - name: deploy
       runAfter:
         - clone
       workspaces:
@@ -87,6 +87,37 @@ spec:
               done < /tmp/file_refs.txt
 
               rm -f /tmp/file_refs.txt
+
+              if [ "$FAILED" -ne 0 ]; then
+                echo "One or more files could not be restored." >&2
+                exit 1
+              fi
+
+              # --- Restore kubeconfig files to $HOME/Downloads/kubeconfig/ ---
+              # These are referenced by fixed path in .envrc files, not via
+              # values.json's file(...) mechanism, so they're handled separately.
+
+              KC_DEST_DIR="$HOME/Downloads/kubeconfig"
+              mkdir -p "$KC_DEST_DIR"
+
+              KC_FILES="artifactory.yml gingersociety.yaml tekton.yaml"
+
+              echo "--- Restoring kubeconfig files to $KC_DEST_DIR ---"
+
+              for FILE_NAME in $KC_FILES; do
+                SRC="$DEPLOY_DIR/$FILE_NAME"
+                DEST="$KC_DEST_DIR/$FILE_NAME"
+
+                if [ ! -f "$SRC" ]; then
+                  echo "✗ Missing '$FILE_NAME' in deployment-target workspace"
+                  FAILED=1
+                  continue
+                fi
+
+                cp "$SRC" "$DEST"
+                chmod 600 "$DEST"
+                echo "✓ Copied '$FILE_NAME' -> $DEST"
+              done
 
               if [ "$FAILED" -ne 0 ]; then
                 echo "One or more files could not be restored." >&2
