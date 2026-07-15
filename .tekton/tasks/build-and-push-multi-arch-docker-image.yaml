@@ -18,6 +18,7 @@ spec:
     echo "ORG_ID: $ORG_ID"
     echo "IMAGE_NAME: $IMAGE_NAME"
     echo "BUILD_CONTEXT: $BUILD_CONTEXT"
+    echo "ctx: $ctx" 
 
     cd "$HOME"
     export TMPDIR="$HOME/.tmp"
