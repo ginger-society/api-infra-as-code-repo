@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-multi-arch-rust-image-pipeline
+  annotations:
+    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
+    x-gitter-enabled: "true"
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: org_id
+      type: string
+
+  tasks:
+    - name: docker-multi-arch-build
+      runAfter:
+        - init-credentials
+      taskRef:
+        apiVersion: gingersociety.org/v1alpha1
+        kind: RemoteTask
+        name: docker-multi-arch-build
+      params:
+        - name: namespace
+          value: default
+        - name: env
+          value: |
+            - name: GIT_REPO_NAME
+              value: "$(params.repo)"
+            - name: IMAGE_TAG
+              value: "$(params.image_tag)"
+            - name: DOCKERFILE_PATH
+              value: "jobs/multi-arch-rust.Dockerfile"
+            - name: ORG_ID
+              value: "$(params.org_id)"
+            - name: IMAGE_NAME
+              value: "multi-arch-rust"
+            - name: BUILD_CONTEXT
+              value: "jobs"
+
+    - name: notify-version-update
+      runAfter:
+        - docker-multi-arch-build
+      taskSpec:
+        steps:
+          - name: echo
+            image: alpine
+            script: |
+              #!/bin/sh
+              echo "Hello World - multi-arch-rust image build is done!"
