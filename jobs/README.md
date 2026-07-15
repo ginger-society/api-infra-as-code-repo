@@ -26,5 +26,14 @@ docker build --progress=plain -t gingersociety/k8-controller-and-runner-base:lat
 docker push gingersociety/k8-controller-and-runner-base:latest
 
 
+docker build --progress=plain -t gingersociety/python3:latest --platform=linux/amd64 -f python3.Dockerfile .
+
+docker push gingersociety/python3:latest
+
+
+docker build --progress=plain -t gingersociety/py-lib-base:latest --platform=linux/amd64 -f py-lib-base.Dockerfile .
+
+docker push gingersociety/py-lib-base:latest
+
 
 

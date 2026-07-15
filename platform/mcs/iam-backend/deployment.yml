@@ -12,7 +12,8 @@ spec:
       labels:
         app: iamservice
     spec:
-
+      securityContext:
+        fsGroup: 1000
       initContainers:
         - name: wait-for-db
           image: postgres:latest
@@ -100,4 +101,4 @@ spec:
         - name: ssh-ca-key
           secret:
             secretName: iam-git-ssh-ca-secret
-            defaultMode: 0400
+            defaultMode: 0440   # owner+group read

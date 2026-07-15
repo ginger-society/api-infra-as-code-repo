@@ -1,0 +1,128 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-pipeline
+  annotations:
+    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
+    x-gitter-enabled: "true"
+    x-gitter-load-env-files: "production"
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: HOSTING_FQDN
+      type: string
+      default: gingersociety.org
+  tasks:
+
+    - name: notify-version-update
+      runAfter:
+        - clone
+      workspaces:
+        - name: deployment-target
+          workspace: deployment-target
+      taskSpec:
+        workspaces:
+          - name: deployment-target
+            optional: true
+        steps:
+          - name: restore-secret-files
+            image: alpine:3.19
+            workingDir: /workspace/source/repo
+            script: |
+              #!/bin/sh
+              set -e
+
+              apk add --no-cache jq >/dev/null
+
+              VALUES_FILE="/workspace/source/repo/values.json"
+              DEPLOY_DIR="$(workspaces.deployment-target.path)"
+
+              if [ ! -f "$VALUES_FILE" ]; then
+                echo "values.json not found at $VALUES_FILE, skipping restore step"
+                exit 0
+              fi
+
+              if [ ! -d "$DEPLOY_DIR" ]; then
+                echo "deployment-target workspace not present, skipping restore step"
+                exit 0
+              fi
+
+              # Extract every file(...) reference's target path from values.json
+              jq -r '
+                .. | strings
+                | select(test("^file\\(.*\\)\\s*$"))
+                | sub("^file\\(";"")
+                | sub("\\)\\s*$";"")
+                | ltrimstr(" ") | rtrimstr(" ")
+              ' "$VALUES_FILE" > /tmp/file_refs.txt
+
+              if [ ! -s /tmp/file_refs.txt ]; then
+                echo "No file(...) references found in values.json"
+                exit 0
+              fi
+
+              echo "--- Restoring secret files from $DEPLOY_DIR ---"
+
+              FAILED=0
+
+              while IFS= read -r REL_PATH; do
+                [ -z "$REL_PATH" ] && continue
+
+                BASENAME=$(basename "$REL_PATH")
+                SRC="$DEPLOY_DIR/$BASENAME"
+                DEST="/workspace/source/repo/$REL_PATH"
+                DEST_DIR=$(dirname "$DEST")
+
+                if [ ! -f "$SRC" ]; then
+                  echo "✗ Missing '$BASENAME' in deployment-target workspace (expected for '$REL_PATH')"
+                  FAILED=1
+                  continue
+                fi
+
+                mkdir -p "$DEST_DIR"
+                cp "$SRC" "$DEST"
+                chmod 600 "$DEST"
+                echo "✓ Restored '$REL_PATH' <- '$BASENAME'"
+              done < /tmp/file_refs.txt
+
+              rm -f /tmp/file_refs.txt
+
+              if [ "$FAILED" -ne 0 ]; then
+                echo "One or more files could not be restored." >&2
+                exit 1
+              fi
+
+              echo "All secret files restored successfully."
+
+          - name: rollout
+            image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
+            workingDir: /workspace/source/repo
+            env:
+              - name: HOSTING_FQDN
+                value: $(params.HOSTING_FQDN)
+            script: |
+              #!/bin/bash
+              set -e
+
+              /usr/local/bin/mount-ginger-credentials.sh
+
+              unset KUBERNETES_SERVICE_HOST
+              unset KUBERNETES_SERVICE_PORT
+              unset KUBERNETES_PORT
+
+              # ginger-infra install-helm-charts
+              # ginger-infra rollout
+
+          - name: echo
+            image: alpine
+            script: |
+              #!/bin/sh
+              echo "Hello World - all previous tasks are done!"
+              KC_PATH="$(workspaces.deployment-target.path)/kubeconfig.yaml"
+              if [ -f "$KC_PATH" ]; then
+                echo "--- kubeconfig found at $KC_PATH ---"
+              else
+                echo "no kubeconfig for this pipeline"
+              fi
+              ls -la "$(workspaces.deployment-target.path)"
