@@ -42,7 +42,7 @@ spec:
 
         cd /workspace/source/repo
 
-        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_repo)"
         FINAL_IMAGE="${IMAGE_REPO}:$(params.image_tag)"
 
         BUILD_ARGS_FLAGS=""
