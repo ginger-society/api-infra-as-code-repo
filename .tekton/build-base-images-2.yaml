@@ -29,10 +29,6 @@ spec:
               value: "$(params.repo)"
             - name: IMAGE_TAG
               value: "$(params.image_tag)"
-            - name: BINARIES_TO_BUILD
-              value: "$(params.binaries_to_build)"
-            - name: BINARIES_TO_UPLOAD
-              value: "$(params.binaries_to_upload)"
 
     - name: notify-version-update
       runAfter:
