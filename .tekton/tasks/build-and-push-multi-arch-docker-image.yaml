@@ -60,29 +60,29 @@ spec:
 
     echo "Building and pushing ${FULL_IMAGE_NAME}:${TAG} (arm64 + amd64) from ${DOCKERFILE_PATH}, context=${BUILD_CONTEXT}..."
 
-    # # ── build + push arm64 ───────────────────────────────────────────────
-    # echo "Building ${TAG}-arm64..."
-    # docker build --progress=plain \
-    #   -t "${FULL_IMAGE_NAME}:${TAG}-arm64" \
-    #   --platform=linux/arm64 \
-    #   "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
-    # docker push "${FULL_IMAGE_NAME}:${TAG}-arm64"
+    # ── build + push arm64 ───────────────────────────────────────────────
+    echo "Building ${TAG}-arm64..."
+    docker build --progress=plain \
+      -t "${FULL_IMAGE_NAME}:${TAG}-arm64" \
+      --platform=linux/arm64 \
+      "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
+    docker push "${FULL_IMAGE_NAME}:${TAG}-arm64"
 
-    # # ── build + push amd64 ───────────────────────────────────────────────
-    # echo "Building ${TAG}-amd64..."
-    # docker build --progress=plain \
-    #   -t "${FULL_IMAGE_NAME}:${TAG}-amd64" \
-    #   --platform=linux/amd64 \
-    #   "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
-    # docker push "${FULL_IMAGE_NAME}:${TAG}-amd64"
+    # ── build + push amd64 ───────────────────────────────────────────────
+    echo "Building ${TAG}-amd64..."
+    docker build --progress=plain \
+      -t "${FULL_IMAGE_NAME}:${TAG}-amd64" \
+      --platform=linux/amd64 \
+      "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
+    docker push "${FULL_IMAGE_NAME}:${TAG}-amd64"
 
-    # # ── assemble + push manifest ─────────────────────────────────────────
-    # echo "Creating manifest ${FULL_IMAGE_NAME}:${TAG}..."
-    # docker manifest create --amend "${FULL_IMAGE_NAME}:${TAG}" \
-    #   "${FULL_IMAGE_NAME}:${TAG}-amd64" \
-    #   "${FULL_IMAGE_NAME}:${TAG}-arm64"
+    # ── assemble + push manifest ─────────────────────────────────────────
+    echo "Creating manifest ${FULL_IMAGE_NAME}:${TAG}..."
+    docker manifest create --amend "${FULL_IMAGE_NAME}:${TAG}" \
+      "${FULL_IMAGE_NAME}:${TAG}-amd64" \
+      "${FULL_IMAGE_NAME}:${TAG}-arm64"
 
-    # docker manifest push "${FULL_IMAGE_NAME}:${TAG}"
+    docker manifest push "${FULL_IMAGE_NAME}:${TAG}"
 
     echo "Multi-arch image build complete: ${FULL_IMAGE_NAME}:${TAG}"
   cleanup: |
