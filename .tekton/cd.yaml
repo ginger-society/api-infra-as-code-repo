@@ -100,29 +100,6 @@ spec:
                 FAILED=1
               fi
 
-              # --- Restore kubeconfig files to $HOME/Downloads/kubeconfig/ ---
-              KC_DEST_DIR="$HOME/Downloads/kubeconfig"
-              mkdir -p "$KC_DEST_DIR"
-
-              KC_FILES="artifactory.yml gingersociety.yaml tekton.yaml"
-
-              echo "--- Restoring kubeconfig files to $KC_DEST_DIR ---"
-
-              for FILE_NAME in $KC_FILES; do
-                SRC="$DEPLOY_DIR/$FILE_NAME"
-                DEST="$KC_DEST_DIR/$FILE_NAME"
-
-                if [ ! -f "$SRC" ]; then
-                  echo "✗ Missing '$FILE_NAME' in deployment-target workspace"
-                  FAILED=1
-                  continue
-                fi
-
-                cp "$SRC" "$DEST"
-                chmod 600 "$DEST"
-                echo "✓ Copied '$FILE_NAME' -> $DEST"
-              done
-
               if [ "$FAILED" -ne 0 ]; then
                 echo "One or more files could not be restored." >&2
                 exit 1
@@ -142,6 +119,29 @@ spec:
 
               /usr/local/bin/mount-ginger-credentials.sh
 
+              # --- Restore kubeconfig files from deployment-target workspace ---
+              DEPLOY_DIR="$(workspaces.deployment-target.path)"
+              KC_DEST_DIR="$HOME/Downloads/kubeconfig"
+              mkdir -p "$KC_DEST_DIR"
+
+              KC_FILES="artifactory.yml gingersociety.yaml tekton.yaml"
+
+              echo "--- Restoring kubeconfig files to $KC_DEST_DIR ---"
+
+              for FILE_NAME in $KC_FILES; do
+                SRC="$DEPLOY_DIR/$FILE_NAME"
+                DEST="$KC_DEST_DIR/$FILE_NAME"
+
+                if [ ! -f "$SRC" ]; then
+                  echo "✗ Missing '$FILE_NAME' in deployment-target workspace"
+                  exit 1
+                fi
+
+                cp "$SRC" "$DEST"
+                chmod 600 "$DEST"
+                echo "✓ Copied '$FILE_NAME' -> $DEST"
+              done
+
               ls -la
 
               unset KUBERNETES_SERVICE_HOST
@@ -150,7 +150,7 @@ spec:
 
               # ginger-infra install-helm-charts
               # ginger-infra rollout
-              kubectl get pods --kubeconfig="~/Downloads/kubeconfig/artifactory.yml"
+              kubectl get pods --kubeconfig="$HOME/Downloads/kubeconfig/artifactory.yml"
 
           - name: echo
             image: alpine
