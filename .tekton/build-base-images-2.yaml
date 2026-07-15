@@ -19,7 +19,7 @@ spec:
       taskRef:
         apiVersion: gingersociety.org/v1alpha1
         kind: RemoteTask
-        name: docker-multi-arch-build
+        name: macos-builds
       params:
         - name: namespace
           value: default
