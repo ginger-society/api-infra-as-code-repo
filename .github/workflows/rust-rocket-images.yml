@@ -42,17 +42,5 @@ jobs:
     - name: Push Rocket vite builder Docker image
       run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vite-react-builder:latest
 
-    - name: Build vite dev container Docker image
-      run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/vite-react-dev:latest . -f devcontainer-images/vite-react/Dockerfile.dev
-
-    - name: Push vite dev Docker image
-      run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vite-react-dev:latest
-
-    - name: Build Rocket dev container Docker image
-      run: docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/rust-rocket-api-dev:latest . -f devcontainer-images/rust-rocket-api/Dockerfile.dev
-
-    - name: Push Rocket dev Docker image
-      run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/rust-rocket-api-dev:latest
-
     # - name: trigger system wide check
     #   run: ginger-connector system-check ${{secrets.GH_TOKEN}}

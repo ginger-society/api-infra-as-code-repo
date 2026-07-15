@@ -8,3 +8,5 @@ vault.json
 bootstrap.sh
 helm-build
 values.json
+ca_key
+catter.sh

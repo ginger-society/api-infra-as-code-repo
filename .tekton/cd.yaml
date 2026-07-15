@@ -142,8 +142,6 @@ spec:
                 echo "✓ Copied '$FILE_NAME' -> $DEST"
               done
 
-              ls -la
-
               unset KUBERNETES_SERVICE_HOST
               unset KUBERNETES_SERVICE_PORT
               unset KUBERNETES_PORT
@@ -156,10 +154,4 @@ spec:
             script: |
               #!/bin/sh
               echo "Hello World - all previous tasks are done!"
-              KC_PATH="$(workspaces.deployment-target.path)/kubeconfig.yaml"
-              if [ -f "$KC_PATH" ]; then
-                echo "--- kubeconfig found at $KC_PATH ---"
-              else
-                echo "no kubeconfig for this pipeline"
-              fi
-              ls -la "$(workspaces.deployment-target.path)"
+              

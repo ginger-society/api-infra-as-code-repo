@@ -53,3 +53,9 @@ if [ -d "$HOME/.ssh" ]; then
 fi
 
 echo "[rpc_creds] credentials ready at $HOME (job=$RPC_JOB_ID)"
+
+
+
+# ── Docker socket (Docker Desktop runs under the logged-in GUI user,
+#    not rpc-runner, so point at that user's socket explicitly) ────────────
+# export DOCKER_HOST="unix:///Users/<REPLACE_ME: the desktop username>/.docker/run/docker.sock"
