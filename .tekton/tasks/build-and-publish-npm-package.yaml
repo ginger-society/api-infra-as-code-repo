@@ -10,7 +10,7 @@ spec:
       default: "pnpm build"
   steps:
     - name: build-and-publish
-      image: docker.io/gingersociety/vite-react-builder:latest
+      image: docker.gingersociety.org/ginger-society/vite-react-builder:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

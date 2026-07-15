@@ -10,7 +10,7 @@ spec:
       default: ""
   steps:
     - name: upload
-      image: gingersociety/tekton-task-ginger-infra:latest
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

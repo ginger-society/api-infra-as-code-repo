@@ -35,10 +35,10 @@ spec:
       default: ""
     - name: base_image
       type: string
-      default: "docker.io/gingersociety/k8-controller-and-runner-base:latest"
+      default: "docker.gingersociety.org/ginger-society/k8-controller-and-runner-base:latest"
   steps:
     - name: build-and-push
-      image: gingersociety/tekton-task-buildah:latest
+      image: docker.gingersociety.org/ginger-society/tekton-task-buildah:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

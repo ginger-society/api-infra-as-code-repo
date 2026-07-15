@@ -20,7 +20,7 @@ spec:
       default: "."
   steps:
     - name: build-and-push
-      image: gingersociety/tekton-task-buildah:latest
+      image: docker.gingersociety.org/ginger-society/tekton-task-buildah:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

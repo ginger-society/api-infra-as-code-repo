@@ -10,7 +10,7 @@ spec:
       default: ""
   steps:
     - name: build
-      image: gingersociety/multi-arch-rust-cli-builder:latest
+      image: docker.gingersociety.org/ginger-society/multi-arch-rust-cli-builder:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

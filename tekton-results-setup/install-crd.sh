@@ -1,7 +1,7 @@
 
 
 ginger-infra install-tekton-crd \
-  --image gingersociety/remote-task-controller:latest \
+  --image docker.gingersociety.org/ginger-society/remote-task-controller:latest \
   --sidekick-url https://api.gingersociety.org/external-executor/run-job
 
 

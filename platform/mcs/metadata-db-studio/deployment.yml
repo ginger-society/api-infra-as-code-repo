@@ -62,44 +62,4 @@ spec:
                 secretKeyRef:
                   name: metadata-postgresql
                   key: postgres-password
-        # - name: backup-sidecar
-        #   image: containers.gingersociety.org/gingersociety/pg-backup-to-aws-helper
-        #   env:
-        #     - name: PG_HOST
-        #       value: "dc01-pg-db-1-postgresql"
-        #     - name: PG_PORT
-        #       value: "5432"
-        #     - name: PG_USER
-        #       value: "postgres"
-        #     - name: PG_PASSWORD
-        #       value: "jamesbond"
-        #     - name: PG_DATABASE
-        #       value: "metadata"
-        #     - name: S3_BUCKET
-        #       value: "rackmint-db-backups"
-        #     - name: AWS_ACCESS_KEY_ID
-        #       value: "KEY"
-        #     - name: AWS_SECRET_ACCESS_KEY
-        #       value: "SECRET"
-        #     - name: AWS_REGION
-        #       value: "ap-south-1"
-        #   command: ["/bin/sh"]
-        #   args:
-        #     - "-c"
-        #     - |
-        #       echo "Starting DB backup loop..."
-        #       export PGPASSWORD=$PG_PASSWORD
-        #       while true; do
-        #         echo "Creating database dump at $(date)..."
-        #         FILENAME="backup_$(date +%Y-%m-%dT%H-%M-%S).sql.gz"
-        #         pg_dump -h $PG_HOST -p $PG_PORT -U $PG_USER -d $PG_DATABASE | gzip > /tmp/$FILENAME
-
-        #         echo "Uploading $FILENAME to S3..."
-        #         aws s3 cp /tmp/$FILENAME s3://$S3_BUCKET/$PG_DATABASE/$FILENAME --region $AWS_REGION
-
-        #         echo "Cleaning up local file..."
-        #         rm /tmp/$FILENAME
-
-        #         echo "Sleeping for 6 hours..."
-        #         sleep 21600
-        #       done
+        

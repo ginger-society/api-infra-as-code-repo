@@ -6,7 +6,7 @@ metadata:
 spec:
   steps:
     - name: build-and-publish
-      image: gingersociety/py-lib-base:latest
+      image: docker.gingersociety.org/ginger-society/py-lib-base:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

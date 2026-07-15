@@ -141,7 +141,7 @@ spec:
       -e "CARGO_TARGET_DIR=/cargo-target" \
       -e "CARGO_HOME=/cargo-home" \
       -w /workspace \
-      gingersociety/multi-arch-rust \
+      docker.gingersociety.org/ginger-society/multi-arch-rust \
       bash -c "cargo build --release --target ${target}${bin_flags} && mkdir -p ./bin/${target} && for b in ${BINARIES[*]}; do cp /cargo-target/${target}/release/\$b ./bin/${target}/; done"
 
     echo "Build complete:"

@@ -6,7 +6,7 @@ metadata:
 spec:
   steps:
     - name: build
-      image: docker.io/gingersociety/vite-react-builder:latest
+      image: docker.gingersociety.org/ginger-society/vite-react-builder:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash

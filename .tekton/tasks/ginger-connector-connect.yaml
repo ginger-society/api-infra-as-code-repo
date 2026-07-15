@@ -15,7 +15,7 @@ spec:
     - name: general-purpose-cache
   steps:
     - name: connect
-      image: gingersociety/tekton-task-ginger-connector-and-db:latest
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-connector-and-db:latest
       imagePullPolicy: Always
       script: |
         #!/bin/bash
