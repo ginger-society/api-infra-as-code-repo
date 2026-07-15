@@ -35,7 +35,7 @@ spec:
               value: "$(params.org_id)"
             - name: IMAGE_NAME
               value: "multi-arch-rust"
-            - name: BUILD_CONTEXT
+            - name: build_context
               value: "jobs"
             - name: ctx
               value: "jobs"

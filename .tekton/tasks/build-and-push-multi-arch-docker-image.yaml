@@ -17,7 +17,7 @@ spec:
     echo "DOCKERFILE_PATH: $DOCKERFILE_PATH"
     echo "ORG_ID: $ORG_ID"
     echo "IMAGE_NAME: $IMAGE_NAME"
-    echo "BUILD_CONTEXT: $BUILD_CONTEXT"
+    echo "BUILD_CONTEXT: $build_context"
     echo "ctx: $ctx" 
 
     cd "$HOME"
