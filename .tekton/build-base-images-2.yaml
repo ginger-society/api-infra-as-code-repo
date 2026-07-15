@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: build-multi-arch-rust-image-pipeline
+  name: build
   annotations:
     x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
     x-gitter-enabled: "true"
