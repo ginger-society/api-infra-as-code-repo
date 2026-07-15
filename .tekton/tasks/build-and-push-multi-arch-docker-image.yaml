@@ -12,12 +12,6 @@ spec:
     source /etc/ginger-society/hooks/rpc_creds.sh
     echo "HOME     : $HOME"
     echo "USER     : $USER"
-    echo "GIT_REPO_NAME: $GIT_REPO_NAME"
-    echo "IMAGE_TAG: $IMAGE_TAG"
-    echo "DOCKERFILE_PATH: $DOCKERFILE_PATH"
-    echo "ORG_ID: $ORG_ID"
-    echo "IMAGE_NAME: $IMAGE_NAME"
-    echo "BUILD_CONTEXT: $BUILD_CONTEXT"
 
     cd "$HOME"
     export TMPDIR="$HOME/.tmp"
@@ -33,60 +27,6 @@ spec:
     echo "Cloned repo, current commit:"
     git log -1 --oneline
 
-    ginger-connector connect prod
-
-    # ── required params ──────────────────────────────────────────────────
-    if [ -z "$DOCKERFILE_PATH" ]; then
-      echo "DOCKERFILE_PATH is required (path to Dockerfile within the repo)"
-      exit 1
-    fi
-    if [ -z "$ORG_ID" ]; then
-      echo "ORG_ID is required (e.g. ginger-society)"
-      exit 1
-    fi
-    if [ -z "$IMAGE_NAME" ]; then
-      echo "IMAGE_NAME is required (e.g. multi-arch-rust)"
-      exit 1
-    fi
-    if [ ! -f "$DOCKERFILE_PATH" ]; then
-      echo "Dockerfile not found at ${DOCKERFILE_PATH}"
-      exit 1
-    fi
-
-    # ── registry is fixed, only org + image name come from params ───────
-    REGISTRY="docker.gingersociety.org"
-    FULL_IMAGE_NAME="${REGISTRY}/${ORG_ID}/${IMAGE_NAME}"
-
-    TAG="${IMAGE_TAG:-latest}"
-    BUILD_CONTEXT="${BUILD_CONTEXT:-.}"
-
-    echo "Building and pushing ${FULL_IMAGE_NAME}:${TAG} (arm64 + amd64) from ${DOCKERFILE_PATH}, context=${BUILD_CONTEXT}..."
-
-    # ── build + push arm64 ───────────────────────────────────────────────
-    echo "Building ${TAG}-arm64..."
-    docker build --progress=plain \
-      -t "${FULL_IMAGE_NAME}:${TAG}-arm64" \
-      --platform=linux/arm64 \
-      "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
-    docker push "${FULL_IMAGE_NAME}:${TAG}-arm64"
-
-    # ── build + push amd64 ───────────────────────────────────────────────
-    echo "Building ${TAG}-amd64..."
-    docker build --progress=plain \
-      -t "${FULL_IMAGE_NAME}:${TAG}-amd64" \
-      --platform=linux/amd64 \
-      "$BUILD_CONTEXT" -f "$DOCKERFILE_PATH"
-    docker push "${FULL_IMAGE_NAME}:${TAG}-amd64"
-
-    # ── assemble + push manifest ─────────────────────────────────────────
-    echo "Creating manifest ${FULL_IMAGE_NAME}:${TAG}..."
-    docker manifest create --amend "${FULL_IMAGE_NAME}:${TAG}" \
-      "${FULL_IMAGE_NAME}:${TAG}-amd64" \
-      "${FULL_IMAGE_NAME}:${TAG}-arm64"
-
-    docker manifest push "${FULL_IMAGE_NAME}:${TAG}"
-
-    echo "Multi-arch image build complete: ${FULL_IMAGE_NAME}:${TAG}"
   cleanup: |
     #!/bin/bash
     echo "cleanup: nothing to do"

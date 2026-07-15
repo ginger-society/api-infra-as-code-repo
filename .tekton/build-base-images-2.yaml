@@ -29,14 +29,6 @@ spec:
               value: "$(params.repo)"
             - name: IMAGE_TAG
               value: "$(params.image_tag)"
-            - name: DOCKERFILE_PATH
-              value: "jobs/multi-arch-rust.Dockerfile"
-            - name: ORG_ID
-              value: "$(params.org_id)"
-            - name: IMAGE_NAME
-              value: "multi-arch-rust"
-            - name: BUILD_CONTEXT
-              value: "jobs"
 
     - name: notify-version-update
       runAfter:
