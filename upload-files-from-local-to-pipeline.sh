@@ -4,12 +4,13 @@ set -eu
 CONFIG_FILE="${1:-}"
 ENVIRONMENT="${2:-}"
 WORKSPACE="${3:-}"
+VAULT_FILE="${4:-./vault.json}"
 
 AUTH_FILE="${HOME}/.ginger-society/auth.json"
 API_URL="https://source.gingersociety.org/env-files"
 
 if [ -z "$CONFIG_FILE" ] || [ -z "$ENVIRONMENT" ] || [ -z "$WORKSPACE" ]; then
-  echo "Usage: $0 <config.json> <environment> <workspace>" >&2
+  echo "Usage: $0 <config.json> <environment> <workspace> [vault_file]" >&2
   exit 1
 fi
 
@@ -24,32 +25,19 @@ API_TOKEN=$(jq -r '.API_TOKEN // empty' "$AUTH_FILE")
 TMP_LIST=$(mktemp)
 trap 'rm -f "$TMP_LIST" /tmp/env-upload-response.json' EXIT
 
-grep -oE 'file\([^)]*\)' "$CONFIG_FILE" \
-  | sed -E 's/^file\((.*)\)$/\1/' \
-  | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
-  | sort -u > "$TMP_LIST"
-
-if [ ! -s "$TMP_LIST" ]; then
-  echo "No file(...) references found in $CONFIG_FILE"
-  exit 0
-fi
-
-echo "Files to upload for environment='$ENVIRONMENT' workspace='$WORKSPACE':"
-cat "$TMP_LIST"
-echo
-
 FAILED=0
 
-while IFS= read -r RAW_PATH; do
-  LOCAL_PATH="$RAW_PATH"
+# ---------- Reusable upload function ----------
+# Usage: upload_file <local_path> <remote_file_name>
+upload_file() {
+  LOCAL_PATH="$1"
+  FILE_NAME="$2"
 
   if [ ! -f "$LOCAL_PATH" ]; then
     echo "✗ Skipping: '$LOCAL_PATH' does not exist relative to $(pwd)"
     FAILED=1
-    continue
+    return
   fi
-
-  FILE_NAME=$(basename "$RAW_PATH")
 
   PAYLOAD=$(jq -n \
     --arg environment "$ENVIRONMENT" \
@@ -78,7 +66,32 @@ while IFS= read -r RAW_PATH; do
       ;;
   esac
   echo
-done < "$TMP_LIST"
+}
+
+# ---------- Upload files referenced via file(...) in config ----------
+
+grep -oE 'file\([^)]*\)' "$CONFIG_FILE" \
+  | sed -E 's/^file\((.*)\)$/\1/' \
+  | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+  | sort -u > "$TMP_LIST"
+
+if [ -s "$TMP_LIST" ]; then
+  echo "Files to upload for environment='$ENVIRONMENT' workspace='$WORKSPACE':"
+  cat "$TMP_LIST"
+  echo
+
+  while IFS= read -r RAW_PATH; do
+    upload_file "$RAW_PATH" "$(basename "$RAW_PATH")"
+  done < "$TMP_LIST"
+else
+  echo "No file(...) references found in $CONFIG_FILE"
+fi
+
+# ---------- Upload vault.json ----------
+
+upload_file "$VAULT_FILE" "vault.json"
+
+# ---------- Summary ----------
 
 if [ "$FAILED" -ne 0 ]; then
   echo "One or more uploads failed." >&2

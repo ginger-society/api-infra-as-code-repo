@@ -57,46 +57,50 @@ spec:
                 | ltrimstr(" ") | rtrimstr(" ")
               ' "$VALUES_FILE" > /tmp/file_refs.txt
 
-              if [ ! -s /tmp/file_refs.txt ]; then
-                echo "No file(...) references found in values.json"
-                exit 0
-              fi
-
-              echo "--- Restoring secret files from $DEPLOY_DIR ---"
-
               FAILED=0
 
-              while IFS= read -r REL_PATH; do
-                [ -z "$REL_PATH" ] && continue
+              if [ -s /tmp/file_refs.txt ]; then
+                echo "--- Restoring secret files from $DEPLOY_DIR ---"
 
-                BASENAME=$(basename "$REL_PATH")
-                SRC="$DEPLOY_DIR/$BASENAME"
-                DEST="/workspace/source/repo/$REL_PATH"
-                DEST_DIR=$(dirname "$DEST")
+                while IFS= read -r REL_PATH; do
+                  [ -z "$REL_PATH" ] && continue
 
-                if [ ! -f "$SRC" ]; then
-                  echo "✗ Missing '$BASENAME' in deployment-target workspace (expected for '$REL_PATH')"
-                  FAILED=1
-                  continue
-                fi
+                  BASENAME=$(basename "$REL_PATH")
+                  SRC="$DEPLOY_DIR/$BASENAME"
+                  DEST="/workspace/source/repo/$REL_PATH"
+                  DEST_DIR=$(dirname "$DEST")
 
-                mkdir -p "$DEST_DIR"
-                cp "$SRC" "$DEST"
-                chmod 600 "$DEST"
-                echo "✓ Restored '$REL_PATH' <- '$BASENAME'"
-              done < /tmp/file_refs.txt
+                  if [ ! -f "$SRC" ]; then
+                    echo "✗ Missing '$BASENAME' in deployment-target workspace (expected for '$REL_PATH')"
+                    FAILED=1
+                    continue
+                  fi
+
+                  mkdir -p "$DEST_DIR"
+                  cp "$SRC" "$DEST"
+                  chmod 600 "$DEST"
+                  echo "✓ Restored '$REL_PATH' <- '$BASENAME'"
+                done < /tmp/file_refs.txt
+              else
+                echo "No file(...) references found in values.json"
+              fi
 
               rm -f /tmp/file_refs.txt
 
-              if [ "$FAILED" -ne 0 ]; then
-                echo "One or more files could not be restored." >&2
-                exit 1
+              # --- Restore vault.json to repo root ---
+              VAULT_SRC="$DEPLOY_DIR/vault.json"
+              VAULT_DEST="/workspace/source/repo/vault.json"
+
+              if [ -f "$VAULT_SRC" ]; then
+                cp "$VAULT_SRC" "$VAULT_DEST"
+                chmod 600 "$VAULT_DEST"
+                echo "✓ Restored vault.json -> $VAULT_DEST"
+              else
+                echo "✗ Missing 'vault.json' in deployment-target workspace"
+                FAILED=1
               fi
 
               # --- Restore kubeconfig files to $HOME/Downloads/kubeconfig/ ---
-              # These are referenced by fixed path in .envrc files, not via
-              # values.json's file(...) mechanism, so they're handled separately.
-
               KC_DEST_DIR="$HOME/Downloads/kubeconfig"
               mkdir -p "$KC_DEST_DIR"
 
