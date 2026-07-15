@@ -35,7 +35,7 @@ spec:
               value: "$(params.org_id)"
             - name: IMAGE_NAME
               value: "multi-arch-rust"
-            - name: build_context
+            - name: BUILD_CONTEXT
               value: "jobs"
 
     - name: notify-version-update
