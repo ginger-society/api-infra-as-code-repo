@@ -18,6 +18,11 @@ spec:
     - name: build_args
       type: array
       default: []
+    - name: org_id
+      type: string
+    - name: registry
+      type: string
+      default: "docker.gingersociety.org"
   steps:
     - name: build-and-push
       image: gingersociety/tekton-task-buildah:latest
@@ -37,8 +42,8 @@ spec:
 
         cd /workspace/source/repo
 
-        REGISTRY="docker.gingersociety.org"
-        FINAL_IMAGE="$REGISTRY/$(params.image_repo):$(params.image_tag)"
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        FINAL_IMAGE="${IMAGE_REPO}:$(params.image_tag)"
 
         BUILD_ARGS_FLAGS=""
         for arg in "$@"; do

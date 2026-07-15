@@ -18,10 +18,6 @@ docker build -t gingersociety/tekton-task-gitter:latest --platform=linux/amd64 -
 docker push gingersociety/tekton-task-gitter:latest
 
 
-docker build --progress=plain -t gingersociety/multi-arch-rust-cli-builder:latest --platform=linux/amd64 -f multi-arch-rust.Dockerfile .
-docker push gingersociety/multi-arch-rust-cli-builder:latest
-
-
 docker build --progress=plain -t gingersociety/k8-controller-and-runner-base:latest --platform=linux/amd64 -f k8-controller-and-runner.Dockerfile .
 docker push gingersociety/k8-controller-and-runner-base:latest
 

@@ -1,8 +1,9 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: build-images-pipeline
+  name: build-tekton-task-images-pipeline
   annotations:
+    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
     x-gitter-enabled: "true"
 spec:
   params:
@@ -11,8 +12,7 @@ spec:
     - name: org_id
       type: string
   tasks:
-    # ─────────────── pipeline-images/rust-rocket-api ───────────────
-    - name: build-push-rust-rocket-builder
+    - name: build-push-ginger-auth
       runAfter:
         - clone
       taskRef:
@@ -26,17 +26,17 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/rust-rocket-api-builder"
+          value: "tekton-task-ginger-auth"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "pipeline-images/rust-rocket-api/Dockerfile.builder"
+          value: "jobs/ginger-auth.Dockerfile"
         - name: build_context
-          value: "pipeline-images/rust-rocket-api"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    - name: build-push-rust-rocket-runner
+    - name: build-push-ginger-infra
       runAfter:
         - clone
       taskRef:
@@ -50,17 +50,17 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/rust-rocket-api-runner"
+          value: "tekton-task-ginger-infra"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "pipeline-images/rust-rocket-api/Dockerfile.runner"
+          value: "jobs/ginger-infra.Dockerfile"
         - name: build_context
-          value: "pipeline-images/rust-rocket-api"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    - name: build-push-vite-react-builder
+    - name: build-push-ginger-connector-and-db
       runAfter:
         - clone
       taskRef:
@@ -74,18 +74,17 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/vite-react-builder"
+          value: "tekton-task-ginger-connector-and-db"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "pipeline-images/vite-react/Dockerfile.builder"
+          value: "jobs/ginger-connector-and-db.Dockerfile"
         - name: build_context
-          value: "pipeline-images/vite-react"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    # ─────────────────────── devcontainer-images ───────────────────────
-    - name: build-push-devcontainer-node
+    - name: build-push-buildah
       runAfter:
         - clone
       taskRef:
@@ -99,17 +98,17 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/dev-container-node"
+          value: "tekton-task-buildah"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "devcontainer-images/Dockerfile.node.debian"
+          value: "jobs/enhanced-buildah.Dockerfile"
         - name: build_context
-          value: "devcontainer-images"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    - name: build-push-devcontainer-rust
+    - name: build-push-gitter
       runAfter:
         - clone
       taskRef:
@@ -123,17 +122,17 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/dev-container-rust"
+          value: "tekton-task-gitter"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "devcontainer-images/Dockerfile.rust.bullseye"
+          value: "jobs/gitter.Dockerfile"
         - name: build_context
-          value: "devcontainer-images"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    - name: build-push-devcontainer-iac
+    - name: build-push-k8-controller-and-runner-base
       runAfter:
         - clone
       taskRef:
@@ -147,29 +146,77 @@ spec:
             value: default
       params:
         - name: image_repo
-          value: "ginger-society/dev-iac"
+          value: "k8-controller-and-runner-base"
         - name: image_tag
           value: "latest"
         - name: dockerfile_path
-          value: "devcontainer-images/Dockerfile.iac.debian"
+          value: "jobs/k8-controller-and-runner.Dockerfile"
         - name: build_context
-          value: "devcontainer-images"
+          value: "jobs"
         - name: org_id
           value: "$(params.org_id)"
 
-    # ─────────────────────────── wrap-up ───────────────────────────
+    - name: build-push-python3
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "python3"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "jobs/python3.Dockerfile"
+        - name: build_context
+          value: "jobs"
+        - name: org_id
+          value: "$(params.org_id)"
+
+    - name: build-push-py-lib-base
+      runAfter:
+        - build-push-python3
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "py-lib-base"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "jobs/py-lib-base.Dockerfile"
+        - name: build_context
+          value: "jobs"
+        - name: org_id
+          value: "$(params.org_id)"
+
     - name: notify-version-update
       runAfter:
-        - build-push-rust-rocket-builder
-        - build-push-rust-rocket-runner
-        - build-push-vite-react-builder
-        - build-push-devcontainer-node
-        - build-push-devcontainer-rust
-        - build-push-devcontainer-iac
+        - build-push-ginger-auth
+        - build-push-ginger-infra
+        - build-push-ginger-connector-and-db
+        - build-push-buildah
+        - build-push-gitter
+        - build-push-k8-controller-and-runner-base
+        - build-push-py-lib-base
       taskSpec:
         steps:
           - name: echo
             image: alpine
             script: |
               #!/bin/sh
-              echo "Hello World - all image builds are done!"
+              echo "Hello World - all tekton-task image builds are done!"
