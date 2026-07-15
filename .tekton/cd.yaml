@@ -148,9 +148,8 @@ spec:
               unset KUBERNETES_SERVICE_PORT
               unset KUBERNETES_PORT
 
-              # ginger-infra install-helm-charts
-              # ginger-infra rollout
-              kubectl get pods --kubeconfig="$HOME/Downloads/kubeconfig/artifactory.yml"
+              ginger-infra install-helm-charts
+              ginger-infra rollout
 
           - name: echo
             image: alpine
