@@ -460,3 +460,7 @@ spec:
             value: |
               #!/bin/bash
               echo "Running cleanup steps..."
+
+
+
+sudo chmod +a "rpc-runner allow read,write" ~/.docker/run/docker.sock

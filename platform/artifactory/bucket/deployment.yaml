@@ -11,8 +11,6 @@ spec:
       app: ginger-bucket
   template:
     metadata:
-      annotations:
-        x-ginger-code-ejectable: "ginger-bucket-service"
       labels:
         app: ginger-bucket
     spec:
@@ -83,6 +81,6 @@ kind: ConfigMap
 metadata:
   name: ginger-bucket-config
 data:
-  UPLOAD_MIRROR_BUCKETS: "ginger-infra-binaries"
+  UPLOAD_MIRROR_BUCKETS: "ginger-infra-binaries,ginger-connector-binaries"
 
 
