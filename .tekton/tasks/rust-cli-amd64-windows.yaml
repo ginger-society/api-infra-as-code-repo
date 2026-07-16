@@ -10,7 +10,7 @@ spec:
       default: ""
   steps:
     - name: build
-      image: docker.gingersociety.org/ginger-society/multi-arch-rust-cli-builder:latest-amd64
+      image: docker.gingersociety.org/ginger-society/multi-arch-rust:latest-amd64
       imagePullPolicy: Always
       script: |
         #!/bin/bash

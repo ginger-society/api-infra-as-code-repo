@@ -3,7 +3,7 @@ kind: Pipeline
 metadata:
   name: deploy-to-prod
   annotations:
-    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
+    # x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
     x-gitter-enabled: "true"
     x-gitter-load-env-files: "production"
 spec:
