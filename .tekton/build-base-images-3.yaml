@@ -3,6 +3,7 @@ kind: Pipeline
 metadata:
   name: build-tekton-task-images-pipeline
   annotations:
+    x-gitter-trigger-branch: '["refs/heads/main", "refs/heads/dev-*"]'
     x-gitter-enabled: "true"
 spec:
   params:
