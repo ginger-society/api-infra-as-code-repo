@@ -146,7 +146,7 @@ spec:
               unset KUBERNETES_SERVICE_PORT
               unset KUBERNETES_PORT
 
-              ginger-infra install-helm-charts
+              # ginger-infra install-helm-charts
               ginger-infra rollout
 
           - name: echo
