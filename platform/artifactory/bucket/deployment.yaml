@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ginger-bucket-service
-          image: docker.gingersociety.org/ginger-society/bucket:latest
+          image: docker.io/gingersociety/ginger-bucket-api-stage:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
