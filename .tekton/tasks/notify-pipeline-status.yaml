@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: notify-version-update
+  namespace: default
+spec:
+  params:
+    - name: environment
+      type: string
+    - name: status
+      type: string
+    - name: branch
+      type: string
+    - name: generation
+      type: string
+  steps:
+    - name: echo
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-connector-and-db:latest
+      env:
+        - name: ENVIRONMENT
+          value: $(params.environment)
+        - name: STATUS
+          value: $(params.status)
+        - name: BRANCH
+          value: $(params.branch)
+        - name: GENERATION
+          value: $(params.generation)
+      script: |
+        #!/bin/sh
+        set -eu
+
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        # ENVIRONMENT / STATUS / BRANCH / GENERATION may carry a trailing newline
+        # (Tekton param set via a `|` block scalar always ends in \n).
+        # Trim it here -- safe now, since these are real env vars,
+        # not raw text spliced into the script.
+        ENVIRONMENT_VAL=$(printf '%s' "$ENVIRONMENT" | tr -d '\n')
+        STATUS_VAL=$(printf '%s' "$STATUS" | tr -d '\n')
+        BRANCH_VAL=$(printf '%s' "$BRANCH" | tr -d '\n')
+        GENERATION_VAL=$(printf '%s' "$GENERATION" | tr -d '\n')
+
+        echo "environment: ${ENVIRONMENT_VAL}"
+        echo "status: ${STATUS_VAL}"
+        echo "branch: ${BRANCH_VAL}"
+        echo "generation: ${GENERATION_VAL}"
+        ginger-connector update-pipeline "${ENVIRONMENT_VAL}" "${STATUS_VAL}" "${BRANCH_VAL}" "${GENERATION_VAL}"
