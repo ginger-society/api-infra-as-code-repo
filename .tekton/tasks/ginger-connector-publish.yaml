@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: ginger-connector-publish
+  namespace: default
+spec:
+  params:
+    - name: environment
+      type: string
+      default: "prod"
+  workspaces:
+    - name: general-purpose-cache
+  steps:
+    - name: publish
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-connector-and-db:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        echo "Publishing ginger-connector to $(params.environment)..."
+        ginger-connector publish "$(params.environment)"
+
+        echo "ginger-connector $(params.environment) publish complete."

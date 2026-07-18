@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: restart-deployment
+  namespace: default
+spec:
+  params:
+    - name: deployment_name
+      type: string
+    - name: kube_context
+      type: string
+    - name: namespace
+      type: string
+      default: "default"
+    - name: wait_for_rollout
+      type: string
+      default: "true"
+  workspaces:
+    - name: ephemeral-kubeconfig
+      optional: true
+  steps:
+    - name: restart
+      image: bitnami/kubectl:latest
+      script: |
+        #!/bin/sh
+        set -e
+
+        if [ "$(workspaces.ephemeral-kubeconfig.bound)" != "true" ]; then
+          echo "No ephemeral-env kubeconfig available — skipping restart of $(params.deployment_name)."
+          exit 0
+        fi
+
+        mkdir -p ~/.kube
+        cp "$(workspaces.ephemeral-kubeconfig.path)/config.yaml" ~/.kube/config.yaml
+        export KUBECONFIG=~/.kube/config.yaml
+
+        kubectl config use-context "$(params.kube_context)"
+
+        echo "Restarting deployment/$(params.deployment_name) in namespace $(params.namespace) on context $(params.kube_context)..."
+        kubectl rollout restart deployment/"$(params.deployment_name)" -n "$(params.namespace)"
+
+        if [ "$(params.wait_for_rollout)" = "true" ]; then
+          kubectl rollout status deployment/"$(params.deployment_name)" -n "$(params.namespace)"
+        else
+          echo "Skipping rollout status wait (wait_for_rollout=false)"
+        fi
