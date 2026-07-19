@@ -38,6 +38,6 @@ spec:
         fi
 
         echo "Uploading ${DOCS_OUTPUT_FOLDER} (version $version) to ${TARGET_BUCKET}..."
-        ginger-infra upload "${TARGET_BUCKET}/${version}" "${DOCS_OUTPUT_FOLDER}" -r
+        ginger-infra upload "${TARGET_BUCKET}/${version}" "${DOCS_OUTPUT_FOLDER}" -r --overwrite
 
         echo "Upload complete."
