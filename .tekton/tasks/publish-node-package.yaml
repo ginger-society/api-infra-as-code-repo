@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: publish-npm-package
+  namespace: default
+spec:
+  steps:
+    - name: publish
+      image: docker.gingersociety.org/ginger-society/vite-react-builder:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export HUSKY=0
+        export CI=true
+
+        if [ ! -f "$(workspaces.creds.path)/.npmrc" ]; then
+          echo "No .npmrc found in creds workspace — did ginger-auth run first?"
+          exit 1
+        fi
+        cp "$(workspaces.creds.path)/.npmrc" "$HOME/.npmrc"
+        chmod 600 "$HOME/.npmrc"
+
+        cd "$(workspaces.source.path)/repo"
+
+        export PNPM_HOME="$(workspaces.general-purpose-cache.path)/pnpm"
+        pnpm config set store-dir "$PNPM_HOME"
+
+        echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")..."
+        pnpm publish --no-git-checks --reporter=append-only

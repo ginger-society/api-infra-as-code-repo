@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: run-build-command
+  namespace: default
+spec:
+  params:
+    - name: build_command
+      type: string
+      default: "pnpm build"
+  steps:
+    - name: build
+      image: docker.gingersociety.org/ginger-society/vite-react-builder:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        export HUSKY=0
+        export CI=true
+
+        cd "$(workspaces.source.path)/repo"
+
+        export PNPM_HOME="$(workspaces.general-purpose-cache.path)/pnpm"
+        pnpm config set store-dir "$PNPM_HOME"
+
+        echo "Running build command: $(params.build_command)"
+        $(params.build_command)

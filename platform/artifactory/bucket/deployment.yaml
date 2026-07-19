@@ -80,6 +80,8 @@ spec:
               value: "8080"
             - name: BUCKET_ROOT
               value: "/app/bucket-data"
+            - name: DOCS_BUCKETS
+              value: 'ginger-docs'
           volumeMounts:
             - name: bucket-data
               mountPath: /app/bucket-data
