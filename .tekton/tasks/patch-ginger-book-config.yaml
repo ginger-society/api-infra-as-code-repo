@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: patch-ginger-book-config
+  namespace: default
+spec:
+  params:
+    - name: config_path
+      type: string
+      default: ".ginger-book/config.mjs"
+    - name: base_path_prefix
+      type: string
+  steps:
+    - name: patch-config
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Patching ginger-book config..."
+
+        cd /workspace/source/repo
+
+        version=$(jq -r '.version' package.json)
+
+        if [ -z "$version" ] || [ "$version" = "null" ]; then
+          echo "Could not determine version from package.json"
+          exit 1
+        fi
+
+        CONFIG_PATH="$(params.config_path)"
+        BASE_PATH_PREFIX="$(params.base_path_prefix)"
+
+        if [ -z "$BASE_PATH_PREFIX" ]; then
+          echo "base_path_prefix param is required"
+          exit 1
+        fi
+
+        NEW_BASE="${BASE_PATH_PREFIX}/${version}"
+
+        if [ ! -f "$CONFIG_PATH" ]; then
+          echo "Config file not found at ${CONFIG_PATH}"
+          exit 1
+        fi
+
+        echo "Setting base to '${NEW_BASE}' in ${CONFIG_PATH}"
+        sed -i -E "s#(base:[[:space:]]*)['\"][^'\"]*['\"]#\1'${NEW_BASE}'#" "$CONFIG_PATH"
+
+        echo "Result:"
+        grep "base:" "$CONFIG_PATH"
