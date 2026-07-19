@@ -8,6 +8,8 @@ spec:
     - name: docs_output_folder
       type: string
       default: "docs"
+    - name: target_bucket
+      type: string
   steps:
     - name: upload
       image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
@@ -28,13 +30,14 @@ spec:
         fi
 
         DOCS_OUTPUT_FOLDER="$(params.docs_output_folder)"
+        TARGET_BUCKET="$(params.target_bucket)"
 
         if [ ! -d "./${DOCS_OUTPUT_FOLDER}" ]; then
           echo "No ./${DOCS_OUTPUT_FOLDER} directory found — nothing to upload."
           exit 1
         fi
 
-        echo "Uploading ${DOCS_OUTPUT_FOLDER} (version $version)..."
-        ginger-infra upload "ginger-docs/${version}" "${DOCS_OUTPUT_FOLDER}" -r
+        echo "Uploading ${DOCS_OUTPUT_FOLDER} (version $version) to ${TARGET_BUCKET}..."
+        ginger-infra upload "${TARGET_BUCKET}/${version}" "${DOCS_OUTPUT_FOLDER}" -r
 
         echo "Upload complete."
