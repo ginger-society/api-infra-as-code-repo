@@ -1,0 +1,36 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-tekton-task-gitter-image
+  annotations:
+    x-gitter-enabled: "true"
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: org_id
+      type: string
+  tasks:
+    - name: build-push-gitter
+      runAfter:
+        - clone
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: build-and-push-dockerfile-image
+          - name: namespace
+            value: default
+      params:
+        - name: image_repo
+          value: "tekton-task-gitter"
+        - name: image_tag
+          value: "latest"
+        - name: dockerfile_path
+          value: "jobs/gitter.Dockerfile"
+        - name: build_context
+          value: "jobs"
+        - name: org_id
+          value: "$(params.org_id)"
