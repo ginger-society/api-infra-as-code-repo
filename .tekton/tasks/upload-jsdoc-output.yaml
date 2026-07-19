@@ -1,0 +1,40 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: upload-jsdoc-docs
+  namespace: default
+spec:
+  params:
+    - name: docs_output_folder
+      type: string
+      default: "docs"
+  steps:
+    - name: upload
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Uploading jsdoc docs..."
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        version=$(node -p "require('./package.json').version")
+
+        if [ -z "$version" ]; then
+          echo "Could not determine version from package.json"
+          exit 1
+        fi
+
+        DOCS_OUTPUT_FOLDER="$(params.docs_output_folder)"
+
+        if [ ! -d "./${DOCS_OUTPUT_FOLDER}" ]; then
+          echo "No ./${DOCS_OUTPUT_FOLDER} directory found — nothing to upload."
+          exit 1
+        fi
+
+        echo "Uploading ${DOCS_OUTPUT_FOLDER} (version $version)..."
+        ginger-infra upload "ginger-docs/${version}" "${DOCS_OUTPUT_FOLDER}" -r
+
+        echo "Upload complete."
