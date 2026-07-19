@@ -35,6 +35,17 @@ spec:
       labels:
         app: verdaccio
     spec:
+      securityContext:
+        fsGroup: 65533
+      initContainers:
+        - name: fix-perms
+          image: busybox
+          command: ["sh", "-c", "chown -R 10001:65533 /verdaccio/storage"]
+          volumeMounts:
+            - name: storage
+              mountPath: /verdaccio/storage
+          securityContext:
+            runAsUser: 0
       containers:
         - name: verdaccio
           image: docker.gingersociety.org/ginger-society/node-registry:latest
@@ -54,8 +65,8 @@ spec:
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: verdaccio-secrets   # secret name
-                  key: JWT_SECRET_KEY       # key inside the secret
+                  name: verdaccio-secrets
+                  key: JWT_SECRET_KEY
             - name: RABBITMQ_URI
               valueFrom:
                 secretKeyRef:
@@ -64,7 +75,7 @@ spec:
             - name: SYNC_PACKAGES
               value: "@gingersociety/ginger-ui"
             - name: IAM_LOGIN_URL
-              value: "https://iam.{{HOSTING_FQDN}}/#node-packages-registry/login"   # ← replace with your IAM URL
+              value: "https://iam.{{HOSTING_FQDN}}/#node-packages-registry/login"
             - name: RUST_LOG
               value: "debug"
             - name: ROCKET_SECRET_KEY
@@ -74,10 +85,8 @@ spec:
                   key: ROCKET_SECRET_KEY
             - name: ROCKET_ADDRESS
               value: "0.0.0.0"
-
             - name: ROCKET_PORT
               value: "8080"
-
           volumeMounts:
             - name: storage
               mountPath: /verdaccio/storage

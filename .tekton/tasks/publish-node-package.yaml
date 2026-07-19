@@ -4,6 +4,10 @@ metadata:
   name: publish-npm-package
   namespace: default
 spec:
+  params:
+    - name: package_path
+      type: string
+      default: "."
   steps:
     - name: publish
       image: docker.gingersociety.org/ginger-society/vite-react-builder:latest
@@ -22,10 +26,10 @@ spec:
         cp "$(workspaces.creds.path)/.npmrc" "$HOME/.npmrc"
         chmod 600 "$HOME/.npmrc"
 
-        cd "$(workspaces.source.path)/repo"
+        cd "$(workspaces.source.path)/repo/$(params.package_path)"
 
         export PNPM_HOME="$(workspaces.general-purpose-cache.path)/pnpm"
         pnpm config set store-dir "$PNPM_HOME"
 
-        echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")..."
+        echo "Publishing $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version") from $(params.package_path)..."
         pnpm publish --no-git-checks --reporter=append-only
