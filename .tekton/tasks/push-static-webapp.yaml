@@ -23,6 +23,14 @@ spec:
     - name: base_image
       type: string
       default: "docker.io/nginx:alpine"
+    - name: nginx_conf_path
+      type: string
+      default: ""
+      description: "Optional path (relative to repo root) to a custom nginx config file to bake into the image. Leave empty to use the base image's default config."
+    - name: nginx_conf_dest
+      type: string
+      default: "/etc/nginx/conf.d/default.conf"
+      description: "Destination path inside the image for the custom nginx config. Use /etc/nginx/nginx.conf if you're overriding the whole main config instead of just the server block."
   steps:
     - name: build-and-push
       image: docker.gingersociety.org/ginger-society/tekton-task-buildah:latest
@@ -48,6 +56,12 @@ spec:
           exit 1
         fi
 
+        NGINX_CONF_SRC="$(params.nginx_conf_path)"
+        if [ -n "$NGINX_CONF_SRC" ] && [ ! -f "$NGINX_CONF_SRC" ]; then
+          echo "nginx_conf_path was set to '$NGINX_CONF_SRC' but that file was not found."
+          exit 1
+        fi
+
         IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
         FINAL_IMAGE_LATEST="${IMAGE_REPO}:latest"
 
@@ -60,6 +74,14 @@ spec:
           --storage-driver=vfs \
           --root=$CONTAINERS_STORAGE \
           "$container" "$DIST_SRC" "$(params.nginx_html_dest)"
+
+        if [ -n "$NGINX_CONF_SRC" ]; then
+          echo "Applying custom nginx config: $NGINX_CONF_SRC -> $(params.nginx_conf_dest)"
+          buildah copy \
+            --storage-driver=vfs \
+            --root=$CONTAINERS_STORAGE \
+            "$container" "$NGINX_CONF_SRC" "$(params.nginx_conf_dest)"
+        fi
 
         buildah commit \
           --storage-driver=vfs \
