@@ -8,7 +8,7 @@ spec:
     - name: docs_output_folder
       type: string
       default: "docs/_build/html"
-    - name: target_path_prefix
+    - name: bucket_name
       type: string
   steps:
     - name: upload
@@ -35,10 +35,10 @@ spec:
         fi
 
         DOCS_OUTPUT_FOLDER="$(params.docs_output_folder)"
-        TARGET_PATH_PREFIX="$(params.target_path_prefix)"
+        BUCKET_NAME="$(params.bucket_name)"
 
-        if [ -z "$TARGET_PATH_PREFIX" ]; then
-          echo "target_path_prefix param is required"
+        if [ -z "$BUCKET_NAME" ]; then
+          echo "bucket_name param is required"
           exit 1
         fi
 
@@ -47,7 +47,7 @@ spec:
           exit 1
         fi
 
-        TARGET_PATH="${TARGET_PATH_PREFIX}/${version}"
+        TARGET_PATH="${BUCKET_NAME}/${version}"
 
         echo "Uploading ${DOCS_OUTPUT_FOLDER} (version ${version}) to ${TARGET_PATH}..."
         ginger-infra upload "${TARGET_PATH}" "${DOCS_OUTPUT_FOLDER}" -r
