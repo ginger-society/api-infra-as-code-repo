@@ -22,12 +22,20 @@ spec:
         cd /workspace/source/repo
 
         echo "Building sdist and wheel..."
-        python setup.py sdist bdist_wheel
+        python setup.py -q sdist bdist_wheel > /tmp/build.log 2>&1 || {
+          echo "Build failed. Full output:"
+          cat /tmp/build.log
+          exit 1
+        }
 
         echo "Build artifacts:"
         find dist -type f
 
         echo "Uploading to PyPI repository: $(params.pypi_repository)..."
-        python -m twine upload -r "$(params.pypi_repository)" dist/*
+        python -m twine upload -r "$(params.pypi_repository)" dist/* > /tmp/upload.log 2>&1 || {
+          echo "Upload failed. Full output:"
+          cat /tmp/upload.log
+          exit 1
+        }
 
         echo "Publish complete."

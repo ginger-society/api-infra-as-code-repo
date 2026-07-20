@@ -81,7 +81,7 @@ spec:
             - name: BUCKET_ROOT
               value: "/app/bucket-data"
             - name: DOCS_BUCKETS
-              value: 'ginger-book-docs,ginger-ui-stories,ginger-ui-uml-stories'
+              value: 'ginger-book-docs,ginger-ui-stories,ginger-ui-uml-stories,ginger-dj-tech-docs'
           volumeMounts:
             - name: bucket-data
               mountPath: /app/bucket-data

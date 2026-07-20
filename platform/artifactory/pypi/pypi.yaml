@@ -1,4 +1,3 @@
-
 apiVersion: v1
 kind: Secret
 metadata:
@@ -42,13 +41,22 @@ spec:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
           effect: "NoSchedule"
+      securityContext:
+        fsGroup: 65533
       initContainers:
         - name: init-tmp-dir
           image: busybox:1.36
-          command: ["sh", "-c", "mkdir -p /data/packages/.tmp"]
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/packages/.tmp
+              chown -R 10001:65533 /data/packages
           volumeMounts:
             - mountPath: /data/packages
               name: pypi-storage
+          securityContext:
+            runAsUser: 0
       containers:
         - name: pip-index
           image: docker.gingersociety.org/ginger-society/pip-registry:latest
