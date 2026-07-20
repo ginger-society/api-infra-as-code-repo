@@ -1,0 +1,55 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: upload-python-docs
+  namespace: default
+spec:
+  params:
+    - name: docs_output_folder
+      type: string
+      default: "docs/_build/html"
+    - name: target_path_prefix
+      type: string
+  steps:
+    - name: upload
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Uploading python docs..."
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        if [ ! -f "pyproject.toml" ]; then
+          echo "No pyproject.toml found"
+          exit 1
+        fi
+
+        version=$(grep -m1 '^version[[:space:]]*=' pyproject.toml | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]*)"/\1/')
+
+        if [ -z "$version" ]; then
+          echo "Could not determine version from pyproject.toml"
+          exit 1
+        fi
+
+        DOCS_OUTPUT_FOLDER="$(params.docs_output_folder)"
+        TARGET_PATH_PREFIX="$(params.target_path_prefix)"
+
+        if [ -z "$TARGET_PATH_PREFIX" ]; then
+          echo "target_path_prefix param is required"
+          exit 1
+        fi
+
+        if [ ! -d "./${DOCS_OUTPUT_FOLDER}" ]; then
+          echo "No ./${DOCS_OUTPUT_FOLDER} directory found — nothing to upload."
+          exit 1
+        fi
+
+        TARGET_PATH="${TARGET_PATH_PREFIX}/${version}"
+
+        echo "Uploading ${DOCS_OUTPUT_FOLDER} (version ${version}) to ${TARGET_PATH}..."
+        ginger-infra upload "${TARGET_PATH}" "${DOCS_OUTPUT_FOLDER}" -r
+
+        echo "Upload complete."

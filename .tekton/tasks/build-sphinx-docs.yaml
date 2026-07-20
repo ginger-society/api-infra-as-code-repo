@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-sphinx-docs
+  namespace: default
+spec:
+  params:
+    - name: docs_dir
+      type: string
+      default: "docs"
+  steps:
+    - name: build-docs
+      image: docker.gingersociety.org/ginger-society/py-lib-base:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        cd "/workspace/source/repo/$(params.docs_dir)"
+
+        echo "Building Sphinx docs in $(params.docs_dir)..."
+        make html

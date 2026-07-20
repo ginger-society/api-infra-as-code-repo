@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: publish-python-package
+  namespace: default
+spec:
+  params:
+    - name: pypi_repository
+      type: string
+      default: "ginger-society"
+  steps:
+    - name: publish
+      image: docker.gingersociety.org/ginger-society/py-lib-base:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        cp "$(workspaces.creds.path)/.pypirc" "$HOME/.pypirc"
+        chmod 600 "$HOME/.pypirc"
+
+        cd /workspace/source/repo
+
+        echo "Building sdist and wheel..."
+        python setup.py sdist bdist_wheel
+
+        echo "Build artifacts:"
+        find dist -type f
+
+        echo "Uploading to PyPI repository: $(params.pypi_repository)..."
+        python -m twine upload -r "$(params.pypi_repository)" dist/*
+
+        echo "Publish complete."

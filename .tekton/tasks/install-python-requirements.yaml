@@ -1,0 +1,38 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: install-python-requirements
+  namespace: default
+spec:
+  params:
+    - name: requirements_file
+      type: string
+      default: "requirements.txt"
+    - name: extra_packages
+      type: string
+      default: ""
+  steps:
+    - name: install
+      image: docker.gingersociety.org/ginger-society/py-lib-base:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        cd /workspace/source/repo
+
+        python -m pip install --upgrade pip
+
+        REQUIREMENTS_FILE="$(params.requirements_file)"
+        if [ -f "$REQUIREMENTS_FILE" ]; then
+          echo "Installing from ${REQUIREMENTS_FILE}..."
+          pip install -r "$REQUIREMENTS_FILE"
+        else
+          echo "No ${REQUIREMENTS_FILE} found — skipping requirements install."
+        fi
+
+        EXTRA_PACKAGES="$(params.extra_packages)"
+        if [ -n "$EXTRA_PACKAGES" ]; then
+          echo "Installing extra packages: ${EXTRA_PACKAGES}"
+          pip install $EXTRA_PACKAGES
+        fi
