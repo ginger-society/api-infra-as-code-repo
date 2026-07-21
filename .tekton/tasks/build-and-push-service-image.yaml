@@ -21,6 +21,7 @@ spec:
       default: ""
     - name: entrypoint
       type: string
+      default: ""
     - name: run_as_root
       type: string
       default: "false"
@@ -53,7 +54,6 @@ spec:
 
         cd /workspace/source/repo
 
-        # ── binary already built by build-amd64-linux ─────────────────────
         BINARY_SRC="./bin/x86_64-unknown-linux-gnu/$(params.binary_name)"
         BINARY_DEST="$(params.binary_dest)"
         if [ -z "$BINARY_DEST" ]; then
@@ -65,6 +65,12 @@ spec:
           echo "Make sure '$(params.binary_name)' is listed in build-amd64-linux's binaries_to_build param."
           exit 1
         fi
+
+        ENTRYPOINT_VAL="$(params.entrypoint)"
+        if [ -z "$ENTRYPOINT_VAL" ]; then
+          ENTRYPOINT_VAL="$BINARY_DEST"
+        fi
+        echo "Using entrypoint: $ENTRYPOINT_VAL"
 
         IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
         FINAL_IMAGE_LATEST="${IMAGE_REPO}:latest"
@@ -107,7 +113,7 @@ spec:
         buildah config \
           --storage-driver=vfs \
           --root=$CONTAINERS_STORAGE \
-          --entrypoint "$(params.entrypoint)" \
+          --entrypoint "$ENTRYPOINT_VAL" \
           "$container"
 
         buildah commit \
