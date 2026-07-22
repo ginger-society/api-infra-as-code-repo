@@ -13,7 +13,12 @@ spec:
       description: "The DB folder name (e.g. metadata, IAM)"
     - name: image_name
       type: string
-      description: "The Docker image name (e.g. gingersociety/metadata-db-runtime-prod)"
+      description: "The Docker image name (e.g. metadata-db-runtime-prod)"
+    - name: registry
+      type: string
+      default: "docker.gingersociety.org"
+    - name: org_id
+      type: string
   steps:
     - name: build-and-push-db
       image: gingersociety/tekton-task-buildah:latest
@@ -31,6 +36,9 @@ spec:
         /usr/local/bin/mount-docker-credentials.sh
 
         cd /workspace/source/repo/$(params.db_name)
+
+        IMAGE_REPO="$(params.registry)/$(params.org_id)/$(params.image_name)"
+        FINAL_IMAGE="${IMAGE_REPO}:$(params.image_tag)"
 
         # --- buildah equivalent of the Dockerfile ---
 
@@ -55,12 +63,12 @@ spec:
           migrations /app/src/migrations
 
         buildah commit --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
-          docker.gingersociety.org/$(params.image_name):$(params.image_tag)
+          "$FINAL_IMAGE"
 
         buildah push --authfile ~/.docker/config.json --storage-driver=vfs --root=$CONTAINERS_STORAGE \
-          docker.gingersociety.org/$(params.image_name):$(params.image_tag)
+          "$FINAL_IMAGE"
 
-        echo "Image pushed successfully: docker.gingersociety.org/$(params.image_name):$(params.image_tag)"
+        echo "Image pushed successfully: $FINAL_IMAGE"
 
       securityContext:
         privileged: true
