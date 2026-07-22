@@ -1,0 +1,66 @@
+# .tekton/tasks/build-and-push-db.yml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-and-push-db
+  namespace: default
+spec:
+  params:
+    - name: image_tag
+      type: string
+    - name: db_name
+      type: string
+      description: "The DB folder name (e.g. metadata, IAM)"
+    - name: image_name
+      type: string
+      description: "The Docker image name (e.g. gingersociety/metadata-db-runtime-prod)"
+  steps:
+    - name: build-and-push-db
+      image: gingersociety/tekton-task-buildah:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+
+        /usr/local/bin/configure_buildah.sh
+
+        export XDG_RUNTIME_DIR=/workspace/buildah-cache/runtime
+        export CONTAINERS_STORAGE=/workspace/buildah-cache/storage
+        export CONTAINERS_STORAGE_CONF=/workspace/buildah-cache/storage.conf
+
+        /usr/local/bin/mount-docker-credentials.sh
+
+        cd /workspace/source/repo/$(params.db_name)
+
+        # --- buildah equivalent of the Dockerfile ---
+
+        ctr=$(buildah from \
+          --storage-driver=vfs \
+          --root=$CONTAINERS_STORAGE \
+          docker.io/gingersociety/db-compose-runtime-prod:latest)
+
+        buildah config --port 8000 "$ctr" \
+          --storage-driver=vfs --root=$CONTAINERS_STORAGE
+
+        buildah run --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" -- \
+          rm -r /app/src/migrations
+
+        buildah copy --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
+          models.py /app/src/models.py
+
+        buildah copy --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
+          admin.py /app/src/admin.py
+
+        buildah copy --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
+          migrations /app/src/migrations
+
+        buildah commit --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
+          docker.gingersociety.org/$(params.image_name):$(params.image_tag)
+
+        buildah push --authfile ~/.docker/config.json --storage-driver=vfs --root=$CONTAINERS_STORAGE \
+          docker.gingersociety.org/$(params.image_name):$(params.image_tag)
+
+        echo "Image pushed successfully: docker.gingersociety.org/$(params.image_name):$(params.image_tag)"
+
+      securityContext:
+        privileged: true
