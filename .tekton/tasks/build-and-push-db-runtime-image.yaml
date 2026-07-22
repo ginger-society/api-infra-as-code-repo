@@ -47,8 +47,9 @@ spec:
           --root=$CONTAINERS_STORAGE \
           docker.io/gingersociety/db-compose-runtime-prod:latest)
 
-        buildah config --port 8000 "$ctr" \
-          --storage-driver=vfs --root=$CONTAINERS_STORAGE
+        buildah config \
+          --storage-driver=vfs --root=$CONTAINERS_STORAGE \
+          --port 8000 "$ctr"
 
         buildah run --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" -- \
           rm -r /app/src/migrations
