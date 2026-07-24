@@ -36,7 +36,9 @@ chmod 644 /workspace/creds/docker/config.json
 # npmrc and pypirc if your pipeline needs them
 cp ~/.npmrc   /workspace/creds/.npmrc
 cp ~/.pypirc  /workspace/creds/.pypirc
+cp ~/.netrc  /workspace/creds/.netrc
 chmod 644 /workspace/creds/.npmrc
 chmod 644 /workspace/creds/.pypirc
+chmod 644 /workspace/creds/.netrc
 
 echo "Credentials written to /workspace/creds"
