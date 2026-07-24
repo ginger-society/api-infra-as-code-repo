@@ -45,7 +45,7 @@ spec:
         ctr=$(buildah from \
           --storage-driver=vfs \
           --root=$CONTAINERS_STORAGE \
-          docker.io/gingersociety/db-compose-runtime-prod:latest)
+          docker.gingersociety.org/ginger-society/schema-gen-service:latest)
 
         buildah config \
           --storage-driver=vfs --root=$CONTAINERS_STORAGE \
