@@ -73,7 +73,8 @@ if [ "$arch" == "unknown" ] || [ "$os" == "unknown" ]; then
 fi
 
 # Format the URL
-url="https://$pkg_name-binaries.s3.ap-south-1.amazonaws.com/$version/$arch-$os/$pkg_name"
+# url="https://$pkg_name-binaries.s3.ap-south-1.amazonaws.com/$version/$arch-$os/$pkg_name"
+url="https://bucket.gingersociety.org/files/$pkg_name-binaries/$version/$arch-$os/$pkg_name"
 
 # Output the formatted URL
 echo "Download URL: $url"
