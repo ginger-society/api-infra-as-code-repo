@@ -42,3 +42,4 @@ chmod 644 /workspace/creds/.pypirc
 chmod 644 /workspace/creds/.netrc
 
 echo "Credentials written to /workspace/creds"
+ls -la /workspace/creds/
