@@ -36,7 +36,8 @@ spec:
           exit 1
         fi
 
-        NEW_BASE="${BASE_PATH_PREFIX}/${version}"
+        NEW_BASE="${BASE_PATH_PREFIX}"
+        # NEW_BASE="${BASE_PATH_PREFIX}/${version}"
 
         if [ ! -f "$CONFIG_PATH" ]; then
           echo "Config file not found at ${CONFIG_PATH}"
