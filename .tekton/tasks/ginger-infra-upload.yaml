@@ -1,0 +1,67 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: upload-to-bucket
+  namespace: default
+spec:
+  params:
+    - name: folder_name
+      type: string
+      description: "Path (relative to the repo root) of the folder to upload"
+    - name: bucket_name
+      type: string
+      description: "Target bucket path to upload into (e.g. \"videos/2024\") - the local folder's contents are placed directly under this path"
+    - name: recursive
+      type: string
+      default: "true"
+      description: "Whether to upload the folder recursively (true/false)"
+    - name: replace
+      type: string
+      default: "true"
+      description: "Whether to overwrite existing files/directories at the destination (true/false)"
+  steps:
+    - name: upload
+      image: docker.gingersociety.org/ginger-society/tekton-task-ginger-infra:latest
+      imagePullPolicy: Always
+      script: |
+        #!/bin/bash
+        set -e
+        echo "Uploading folder to bucket..."
+        /usr/local/bin/mount-ginger-credentials.sh
+
+        cd /workspace/source/repo
+
+        FOLDER_NAME="$(params.folder_name)"
+        BUCKET_NAME="$(params.bucket_name)"
+        RECURSIVE="$(params.recursive)"
+        REPLACE="$(params.replace)"
+
+        if [ -z "$FOLDER_NAME" ]; then
+          echo "folder_name param is required"
+          exit 1
+        fi
+
+        if [ -z "$BUCKET_NAME" ]; then
+          echo "bucket_name param is required"
+          exit 1
+        fi
+
+        if [ ! -d "./${FOLDER_NAME}" ]; then
+          echo "No ./${FOLDER_NAME} directory found — nothing to upload."
+          exit 1
+        fi
+
+        RECURSIVE_FLAG=""
+        if [ "$RECURSIVE" = "true" ]; then
+          RECURSIVE_FLAG="-r"
+        fi
+
+        OVERWRITE_FLAG=""
+        if [ "$REPLACE" = "true" ]; then
+          OVERWRITE_FLAG="--overwrite"
+        fi
+
+        echo "Uploading ${FOLDER_NAME} to ${BUCKET_NAME} (recursive: ${RECURSIVE}, overwrite: ${REPLACE})..."
+        ginger-infra upload "${BUCKET_NAME}" "${FOLDER_NAME}" ${RECURSIVE_FLAG} ${OVERWRITE_FLAG}
+
+        echo "Upload complete."
