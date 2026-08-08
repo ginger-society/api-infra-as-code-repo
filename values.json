@@ -2,11 +2,11 @@
   "HOSTING_FQDN": "shell(echo $HOSTING_FQDN)",
   "IAM_ADMIN": {
    "DB_URL": "shell(set -e; PW=$(kubectl get secret iam-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d); echo postgresql://postgres:${PW}@iam-postgresql:5432/iam-db)",
-    "ISC_SECRET": "verysecure"
+    "ISC_SECRET": "vault(IAM_ADMIN_ISC_TOKEN)"
   },
   "IAM": {
     "DB_URL": "shell(set -e; PW=$(kubectl get secret iam-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d); echo postgresql://postgres:${PW}@iam-postgresql:5432/iam-db)",
-    "ISC_SECRET": "verysecure"
+    "ISC_SECRET": "vault(IAM_ISC_TOKEN)"
   },
   "METADATA": {
     "DB_URL": "shell(set -e; PW=$(kubectl get secret metadata-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d); echo postgresql://postgres:${PW}@metadata-postgresql:5432/metadata-db)",
@@ -47,8 +47,8 @@
   },
   
   "NOTIFICATION": {
-    "AWS_ACCESS_KEY_ID": "vault(AWS_ACCESS_KEY_ID)",
-    "AWS_SECRET_ACCESS_KEY": "vault(AWS_SECRET_ACCESS_KEY)"
+    "AWS_ACCESS_KEY_ID": "vault(AWS_SES_ACCESS_KEY_ID)",
+    "AWS_SECRET_ACCESS_KEY": "vault(AWS_SES_SECRET_ACCESS_KEY)"
   },
   "shared": {
     "DATABASE_PASSWORD": "shell(kubectl get secret pg-postgresql -o jsonpath='{.data.postgres-password}' | base64 -d)",
