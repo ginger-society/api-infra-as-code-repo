@@ -25,6 +25,7 @@ There are few apps deployed
     Available on api-staging.gingersociety.org/metadata/*
 
 
+
 ## Notes we took while creating this repo
 
 deploy your app and service and map the service in ingress file
