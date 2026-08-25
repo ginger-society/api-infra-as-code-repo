@@ -56,7 +56,65 @@ while IFS= read -r mapping; do
 "
 done < <(echo "$PORT_MAPPINGS_JSON" | jq -c '.[]')
 
+# ── Allocate + format + mount the per-cluster disk image FIRST ───────────────
+# This has to happen before `kind create cluster` runs, because the mount
+# point needs to already exist and be a real filesystem before we can point
+# the node's extraMounts at it — kind bind-mounts hostPath into the node
+# container at creation time, it doesn't pick up a mount that shows up later.
+DISK_GB=$(echo "$DISK" | sed 's/[gG]$//')
+LOOP_IMAGE_DIR="/var/kind-disks"
+LOOP_IMAGE="${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.img"
+MOUNT_POINT="/var/kind-mounts/${CLUSTER_NAME}"
+
+mkdir -p "$LOOP_IMAGE_DIR" "$MOUNT_POINT"
+
+echo "Allocating ${DISK_GB}GB disk image for cluster '${CLUSTER_NAME}'..."
+fallocate -l "${DISK_GB}G" "$LOOP_IMAGE"
+if [ $? -ne 0 ]; then
+    echo "WARNING: fallocate failed, trying dd fallback..."
+    dd if=/dev/zero of="$LOOP_IMAGE" bs=1G count="${DISK_GB}" status=progress
+fi
+
+mkfs.ext4 -F "$LOOP_IMAGE"
+
+LOOP_DEV=$(losetup --find --show "$LOOP_IMAGE")
+mount "$LOOP_DEV" "$MOUNT_POINT"
+
+DISK_MOUNTED=0
+if [ $? -ne 0 ]; then
+    echo "WARNING: failed to mount disk image — cluster will be created WITHOUT a disk limit or per-cluster disk isolation"
+else
+    DISK_MOUNTED=1
+
+    # Give the node's future containerd/kubelet dirs their own subdirs on the
+    # mounted volume, so extraMounts below has somewhere real to bind to.
+    mkdir -p "${MOUNT_POINT}/containerd" "${MOUNT_POINT}/kubelet"
+
+    # Persist mount across reboots
+    echo "${LOOP_DEV} ${MOUNT_POINT} ext4 defaults,nofail 0 0" >> /etc/fstab
+
+    # Store metadata so delete script can clean this up
+    echo "LOOP_DEV=${LOOP_DEV}" > "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
+    echo "LOOP_IMAGE=${LOOP_IMAGE}" >> "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
+    echo "MOUNT_POINT=${MOUNT_POINT}" >> "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
+
+    echo "✅ Disk limit of ${DISK_GB}GB allocated at ${MOUNT_POINT}"
+fi
+
 # ── Write Kind config ─────────────────────────────────────────────────────────
+# extraMounts only gets added if the disk actually mounted — falling back to
+# default in-container storage (untracked, unlimited) rather than pointing
+# at a hostPath that doesn't exist, which would fail cluster creation outright.
+EXTRA_MOUNTS_YAML=""
+if [ "$DISK_MOUNTED" -eq 1 ]; then
+    EXTRA_MOUNTS_YAML="  extraMounts:
+  - hostPath: ${MOUNT_POINT}/containerd
+    containerPath: /var/lib/containerd
+  - hostPath: ${MOUNT_POINT}/kubelet
+    containerPath: /var/lib/kubelet
+"
+fi
+
 cat > "$KIND_CONFIG" <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -76,7 +134,7 @@ nodes:
       - ${FQDN}
       - 127.0.0.1
       - localhost
-  extraPortMappings:
+${EXTRA_MOUNTS_YAML}  extraPortMappings:
 ${PORT_MAPPINGS_YAML}
 EOF
 
@@ -103,41 +161,6 @@ if [ $? -ne 0 ]; then
     echo "WARNING: failed to apply CPU/memory limits (non-fatal, cluster still usable)"
 else
     echo "✅ CPU and memory limits applied"
-fi
-
-# ── Apply disk limit via loopback device ──────────────────────────────────────
-# Convert Xg → integer GB for fallocate
-DISK_GB=$(echo "$DISK" | sed 's/[gG]$//')
-LOOP_IMAGE_DIR="/var/kind-disks"
-LOOP_IMAGE="${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.img"
-MOUNT_POINT="/var/kind-mounts/${CLUSTER_NAME}"
-
-mkdir -p "$LOOP_IMAGE_DIR" "$MOUNT_POINT"
-
-echo "Allocating ${DISK_GB}GB disk image for cluster '${CLUSTER_NAME}'..."
-fallocate -l "${DISK_GB}G" "$LOOP_IMAGE"
-if [ $? -ne 0 ]; then
-    echo "WARNING: fallocate failed, trying dd fallback..."
-    dd if=/dev/zero of="$LOOP_IMAGE" bs=1G count="${DISK_GB}" status=progress
-fi
-
-mkfs.ext4 -F "$LOOP_IMAGE"
-
-LOOP_DEV=$(losetup --find --show "$LOOP_IMAGE")
-mount "$LOOP_DEV" "$MOUNT_POINT"
-
-if [ $? -ne 0 ]; then
-    echo "WARNING: failed to mount disk image (non-fatal, cluster still usable)"
-else
-    # Persist mount across reboots
-    echo "${LOOP_DEV} ${MOUNT_POINT} ext4 defaults,nofail 0 0" >> /etc/fstab
-
-    # Store metadata so delete script can clean this up
-    echo "LOOP_DEV=${LOOP_DEV}" > "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
-    echo "LOOP_IMAGE=${LOOP_IMAGE}" >> "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
-    echo "MOUNT_POINT=${MOUNT_POINT}" >> "${LOOP_IMAGE_DIR}/${CLUSTER_NAME}.meta"
-
-    echo "✅ Disk limit of ${DISK_GB}GB applied at ${MOUNT_POINT}"
 fi
 
 # ── Update Nginx stream config ────────────────────────────────────────────────
@@ -195,5 +218,9 @@ echo ""
 echo "✅ Cluster '${CLUSTER_NAME}' ready"
 echo "   CPUs:   ${CPUS}"
 echo "   Memory: ${MEMORY}"
-echo "   Disk:   ${DISK_GB}GB (${MOUNT_POINT})"
+if [ "$DISK_MOUNTED" -eq 1 ]; then
+    echo "   Disk:   ${DISK_GB}GB (${MOUNT_POINT}) — bind-mounted to node's containerd + kubelet storage"
+else
+    echo "   Disk:   ${DISK_GB}GB requested but NOT applied (mount failed) — node using default unlimited storage"
+fi
 echo "   FQDN:   ${FQDN}"

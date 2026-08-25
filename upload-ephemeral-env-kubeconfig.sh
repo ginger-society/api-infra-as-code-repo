@@ -3,15 +3,15 @@
 set -euo pipefail
 
 #
-# create-ephemeral-env.sh
+# upload-ephemeral-env-kubeconfig.sh
 #
-# Creates an ephemeral environment kubeconfig.
+# Uploads a kubeconfig for an ephemeral environment.
 #
 # Usage:
-#   ./create-ephemeral-env.sh <workspace-id> <branch> <kubeconfig-path>
+#   ./upload-ephemeral-env-kubeconfig.sh <workspace-id> <branch> <kubeconfig-path>
 #
 # Example:
-#   ./create-ephemeral-env.sh ginger-society main ~/.kube/config
+#   ./upload-ephemeral-env-kubeconfig.sh ginger-society main ~/.kube/config
 #
 # Requirements:
 #   - curl
