@@ -63,6 +63,9 @@ spec:
         buildah copy --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
           migrations /app/src/migrations
 
+        buildah copy --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
+          additional_templates /app/src/additional_templates
+
         buildah commit --storage-driver=vfs --root=$CONTAINERS_STORAGE "$ctr" \
           "$FINAL_IMAGE"
 
