@@ -31,7 +31,14 @@ KIND_CONFIG="/tmp/kind-${CLUSTER_NAME}.yaml"
 NGINX_ENTRIES_FILE="/etc/nginx/stream.d/kind-cluster-entries.map"
 NGINX_STREAM_CONF="/etc/nginx/stream.d/kind-clusters.conf"
 
+# ── Pinned node image ──────────────────────────────────────────────────────────
+# Bump this deliberately when you want a k8s version upgrade — never let
+# `kind create cluster` decide on its own, since an implicit image pull adds
+# a multi-hundred-MB network fetch directly into cluster-creation latency.
+KIND_NODE_IMAGE="kindest/node:v1.29.2@sha256:51a1434a5397193442f0be2a297b488b6c919ce8a3931be0ce822606ea5ca245"
+
 echo "Resource limits — CPUs: ${CPUS} | Memory: ${MEMORY} | Disk: ${DISK}"
+echo "Node image — ${KIND_NODE_IMAGE}"
 
 # ── Check jq is available ─────────────────────────────────────────────────────
 if ! command -v jq &>/dev/null; then
@@ -42,6 +49,19 @@ fi
 if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     echo "ERROR: cluster '${CLUSTER_NAME}' already exists"
     exit 2
+fi
+
+# ── Ensure the pinned node image is already local before creating anything ────
+# Only pays a real cost the first time this ever runs on a box (or after a
+# deliberate KIND_NODE_IMAGE bump) — every cluster creation after that is
+# 100% local, no network round-trip in the hot path.
+if ! docker image inspect "$KIND_NODE_IMAGE" &>/dev/null; then
+    echo "Pinned image not cached locally, pulling once (one-time cost)..."
+    docker pull "$KIND_NODE_IMAGE"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: failed to pull pinned node image ${KIND_NODE_IMAGE}"
+        exit 6
+    fi
 fi
 
 # ── Build extraPortMappings yaml ──────────────────────────────────────────────
@@ -126,6 +146,7 @@ networking:
 
 nodes:
 - role: control-plane
+  image: ${KIND_NODE_IMAGE}
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
@@ -223,4 +244,5 @@ if [ "$DISK_MOUNTED" -eq 1 ]; then
 else
     echo "   Disk:   ${DISK_GB}GB requested but NOT applied (mount failed) — node using default unlimited storage"
 fi
+echo "   Image:  ${KIND_NODE_IMAGE}"
 echo "   FQDN:   ${FQDN}"
