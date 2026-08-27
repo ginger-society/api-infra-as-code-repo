@@ -29,6 +29,9 @@ esac
 DEVICE_ID=""
 INSTALL_GATEWAY=false
 INSTALL_K8_CLUSTER_MANAGER=false
+AWS_ACCESS_KEY_ID_ARG=""
+AWS_SECRET_ACCESS_KEY_ARG=""
+AWS_REGION_ARG=""
 
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -44,9 +47,21 @@ while [[ "$#" -gt 0 ]]; do
             INSTALL_K8_CLUSTER_MANAGER=true
             shift
             ;;
+        --aws-access-key-id)
+            AWS_ACCESS_KEY_ID_ARG="$2"
+            shift 2
+            ;;
+        --aws-secret-access-key)
+            AWS_SECRET_ACCESS_KEY_ARG="$2"
+            shift 2
+            ;;
+        --aws-region)
+            AWS_REGION_ARG="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown argument: $1"
-            echo "Usage: curl -fsSL <url> | bash -s -- --device-id <device-id> [--install-gateway]"
+            echo "Usage: curl -fsSL <url> | bash -s -- --device-id <device-id> [--install-gateway] [--aws-access-key-id <id> --aws-secret-access-key <key> [--aws-region <region>]] [--install-k8-cluster-manager]"
             exit 1
             ;;
     esac
@@ -239,7 +254,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "This will install and configure the following:"
 echo "  • Snap"
-echo "  • Certbot (via Snap)"
+echo "  • Certbot (via Snap) + certbot-dns-route53 plugin"
 echo "  • Apache2 with modules: ssl, proxy, proxy_http, proxy_wstunnel, rewrite, headers, proxy_connect"
 echo "  • Nginx (configured to NOT listen on 80/443 — Apache2 is the main gateway)"
 echo ""
@@ -248,6 +263,60 @@ if ! confirm "Proceed with gateway installation?"; then
     echo "Skipping gateway installation."
     exit 0
 fi
+
+# ── Route53 credentials for certbot dns-route53 ──────────────────────────────
+#
+# install_ssl (in ginger-infra) shells out to `certbot --authenticator
+# dns-route53` to issue wildcard certs for domains whose DNS now lives in
+# Route53 (see api/dns.rs hosted-zone flow). certbot-dns-route53 reads
+# these via the standard AWS SDK env-var credential chain — no
+# credentials-file flag, unlike the old dns-godaddy setup.
+echo ""
+echo "── AWS credentials (for certbot Route53 DNS challenges) ──"
+
+if [ -z "$AWS_ACCESS_KEY_ID_ARG" ]; then
+    read -r -p "AWS Access Key ID: " AWS_ACCESS_KEY_ID_ARG </dev/tty
+fi
+
+if [ -z "$AWS_SECRET_ACCESS_KEY_ARG" ]; then
+    read -r -s -p "AWS Secret Access Key: " AWS_SECRET_ACCESS_KEY_ARG </dev/tty
+    echo ""
+fi
+
+if [ -z "$AWS_ACCESS_KEY_ID_ARG" ] || [ -z "$AWS_SECRET_ACCESS_KEY_ARG" ]; then
+    echo "❌ AWS credentials are required for Route53 DNS challenges (certbot uses these to issue wildcard certs)."
+    exit 1
+fi
+
+AWS_REGION_ARG="${AWS_REGION_ARG:-us-east-1}"
+
+# Written to its own root-only file rather than embedded in the unit file,
+# since unit files are commonly world-readable (0644) and get dumped by
+# `systemctl cat` / bug-report tooling.
+AWS_ENV_FILE="/etc/ginger-infra/aws-credentials.env"
+
+cat > "$AWS_ENV_FILE" <<EOF
+AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_ARG}
+AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_ARG}
+AWS_REGION=${AWS_REGION_ARG}
+EOF
+
+chmod 600 "$AWS_ENV_FILE"
+chown root:root "$AWS_ENV_FILE"
+
+echo "✅ AWS credentials written to ${AWS_ENV_FILE} (0600, root-only)"
+
+# ── Wire AWS credentials into the ginger-infra unit and restart ─────────────
+SERVICE="/etc/systemd/system/ginger-infra.service"
+
+if [ -f "$SERVICE" ] && ! grep -q "^EnvironmentFile=${AWS_ENV_FILE}" "$SERVICE"; then
+    sed -i "/^ExecStart=/a EnvironmentFile=${AWS_ENV_FILE}" "$SERVICE"
+    echo "✅ Linked ${AWS_ENV_FILE} into ginger-infra.service"
+fi
+
+systemctl daemon-reload
+systemctl restart ginger-infra
+echo "✅ ginger-infra restarted with AWS credentials loaded"
 
 apt-get update -y
 
@@ -278,6 +347,19 @@ else
     snap install --classic certbot
     ln -sf /snap/bin/certbot /usr/bin/certbot
     echo "✅ certbot installed."
+fi
+
+# ── Certbot Route53 plugin ────────────────────────────────────────────────────
+echo ""
+echo "── Certbot Route53 DNS plugin ──────────────────────────"
+if snap list certbot-dns-route53 &>/dev/null; then
+    echo "✅ certbot-dns-route53 already installed, skipping."
+else
+    echo "📦 Installing certbot-dns-route53 plugin..."
+    snap install certbot-dns-route53
+    snap set certbot trust-plugin-with-root=ok
+    snap connect certbot:plugin certbot-dns-route53
+    echo "✅ certbot-dns-route53 installed and connected."
 fi
 
 # ── Apache2 ───────────────────────────────────────────────────────────────────
@@ -356,6 +438,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "  Apache2 status:     sudo service apache2 status"
 echo "  Apache2 logs:       /var/log/apache2/"
+echo "  AWS creds file:     ${AWS_ENV_FILE}"
 
 
 # ── K8 Cluster Manager installation ──────────────────────────────────────────
