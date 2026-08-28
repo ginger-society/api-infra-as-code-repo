@@ -271,8 +271,31 @@ fi
 # Route53 (see api/dns.rs hosted-zone flow). certbot-dns-route53 reads
 # these via the standard AWS SDK env-var credential chain — no
 # credentials-file flag, unlike the old dns-godaddy setup.
+#
+# Written to its own root-only file rather than embedded in the unit file,
+# since unit files are commonly world-readable (0644) and get dumped by
+# `systemctl cat` / bug-report tooling.
+AWS_ENV_FILE="/etc/ginger-infra/aws-credentials.env"
+
 echo ""
 echo "── AWS credentials (for certbot Route53 DNS challenges) ──"
+
+# If the env file already exists, load its current values as fallbacks so
+# a re-run doesn't re-prompt (or silently blank out) credentials that are
+# already in place — only genuinely missing pieces get asked for.
+if [ -f "$AWS_ENV_FILE" ]; then
+    EXISTING_AWS_ACCESS_KEY_ID=$(grep -E '^AWS_ACCESS_KEY_ID=' "$AWS_ENV_FILE" | cut -d= -f2-)
+    EXISTING_AWS_SECRET_ACCESS_KEY=$(grep -E '^AWS_SECRET_ACCESS_KEY=' "$AWS_ENV_FILE" | cut -d= -f2-)
+    EXISTING_AWS_REGION=$(grep -E '^AWS_REGION=' "$AWS_ENV_FILE" | cut -d= -f2-)
+
+    AWS_ACCESS_KEY_ID_ARG="${AWS_ACCESS_KEY_ID_ARG:-$EXISTING_AWS_ACCESS_KEY_ID}"
+    AWS_SECRET_ACCESS_KEY_ARG="${AWS_SECRET_ACCESS_KEY_ARG:-$EXISTING_AWS_SECRET_ACCESS_KEY}"
+    AWS_REGION_ARG="${AWS_REGION_ARG:-$EXISTING_AWS_REGION}"
+
+    if [ -n "$EXISTING_AWS_ACCESS_KEY_ID" ] && [ -n "$EXISTING_AWS_SECRET_ACCESS_KEY" ]; then
+        echo "✅ Existing AWS credentials found at ${AWS_ENV_FILE}, reusing them."
+    fi
+fi
 
 if [ -z "$AWS_ACCESS_KEY_ID_ARG" ]; then
     read -r -p "AWS Access Key ID: " AWS_ACCESS_KEY_ID_ARG </dev/tty
@@ -290,21 +313,20 @@ fi
 
 AWS_REGION_ARG="${AWS_REGION_ARG:-us-east-1}"
 
-# Written to its own root-only file rather than embedded in the unit file,
-# since unit files are commonly world-readable (0644) and get dumped by
-# `systemctl cat` / bug-report tooling.
-AWS_ENV_FILE="/etc/ginger-infra/aws-credentials.env"
-
-cat > "$AWS_ENV_FILE" <<EOF
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_ARG}
+# Only rewrite the file if something actually changed — avoids an
+# unnecessary mtime bump / restart trigger on a no-op re-run.
+NEW_AWS_ENV_CONTENT="AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_ARG}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_ARG}
-AWS_REGION=${AWS_REGION_ARG}
-EOF
+AWS_REGION=${AWS_REGION_ARG}"
 
-chmod 600 "$AWS_ENV_FILE"
-chown root:root "$AWS_ENV_FILE"
-
-echo "✅ AWS credentials written to ${AWS_ENV_FILE} (0600, root-only)"
+if [ -f "$AWS_ENV_FILE" ] && [ "$(cat "$AWS_ENV_FILE")" = "$NEW_AWS_ENV_CONTENT" ]; then
+    echo "✅ AWS credentials unchanged, ${AWS_ENV_FILE} left as-is."
+else
+    echo "$NEW_AWS_ENV_CONTENT" > "$AWS_ENV_FILE"
+    chmod 600 "$AWS_ENV_FILE"
+    chown root:root "$AWS_ENV_FILE"
+    echo "✅ AWS credentials written to ${AWS_ENV_FILE} (0600, root-only)"
+fi
 
 # ── Wire AWS credentials into the ginger-infra unit and restart ─────────────
 SERVICE="/etc/systemd/system/ginger-infra.service"
