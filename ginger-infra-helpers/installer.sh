@@ -216,7 +216,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${BINARY} start --device-id ${DEVICE_ID}
+ExecStart=${BINARY} start --device-id ${DEVICE_ID} --capabilities=metrics
 Restart=always
 RestartSec=5
 WorkingDirectory=/etc/ginger-infra
