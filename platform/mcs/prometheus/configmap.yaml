@@ -70,3 +70,12 @@ data:
             labels:
               host: air
               device_channel: air.ginger_infra_43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d
+      
+      - job_name: 'ginger-infra-dc0102'
+        scheme: https
+        metrics_path: /presence/device-metrics/dc0102.ginger_infra_43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d
+        static_configs:
+          - targets: ['api.gingersociety.org']
+            labels:
+              host: dc0102
+              device_channel: dc0102.ginger_infra_43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d
